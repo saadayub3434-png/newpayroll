@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShiftCard — Multi-Branch Attendance &amp; Payroll</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F2F4F7; --surface:#FFFFFF; --ink:#1C2530; --ink-soft:#5B6472; --ink-faint:#8B93A1; --line:#E2E6EB;
+  --accent:#2B4C7E; --accent-soft:#E8EEF7;
+  --in:#2F6F4E; --in-soft:#E5F2EA; --out:#B0522D; --out-soft:#FBEAE1;
+  --warn:#C0392B; --warn-soft:#FBEAEA; --leave:#8659B5; --leave-soft:#F0E9F8;
+  --gold:#9A6B10; --gold-soft:#FDF3E3; --radius:10px;
+  --shadow:0 1px 2px rgba(28,37,48,0.06), 0 1px 12px rgba(28,37,48,0.04);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif;}
+.mono{font-family:'Roboto Mono',monospace;}
+button{font-family:inherit;cursor:pointer;}
+input,select,textarea{font-family:inherit;}
+a{color:inherit;}
+
+#app{display:flex;min-height:100vh;flex-direction:column;}
+.app-body{display:flex;flex:1;min-height:0;}
+.banner{padding:9px 20px;font-size:12.5px;font-weight:600;text-align:center;}
+.banner.warn{background:var(--warn-soft);color:var(--warn);}
+.banner.ok{background:var(--in-soft);color:var(--in);}
+.banner.info{background:var(--gold-soft);color:var(--gold);}
+
+.sidebar{width:220px;flex-shrink:0;background:var(--ink);color:#fff;display:flex;flex-direction:column;padding:20px 0;}
+.brand{padding:0 20px 20px 20px;border-bottom:1px solid rgba(255,255,255,0.1);margin-bottom:12px;}
+.brand-mark{display:flex;align-items:center;gap:9px;}
+.brand-dot{width:11px;height:11px;border-radius:3px;background:var(--in);box-shadow:3px 3px 0 var(--out), 6px 0 0 var(--accent);flex-shrink:0;}
+.brand-logo{width:30px;height:30px;border-radius:7px;object-fit:cover;flex-shrink:0;}
+.brand-name{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:16px;letter-spacing:0.2px;line-height:1.2;}
+.brand-sub{font-size:10.5px;color:#9FA9BA;margin-top:4px;letter-spacing:0.3px;}
+.nav{display:flex;flex-direction:column;gap:2px;padding:0 12px;overflow-y:auto;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:#B9C1CE;font-size:14px;font-weight:500;border:none;background:none;text-align:left;width:100%;transition:background .12s,color .12s;}
+.nav-item:hover{background:rgba(255,255,255,0.06);color:#fff;}
+.nav-item.active{background:var(--accent);color:#fff;}
+.nav-icon{width:17px;text-align:center;font-size:15px;}
+.sidebar-foot{margin-top:auto;padding:14px 20px 0 20px;border-top:1px solid rgba(255,255,255,0.1);font-size:10.5px;color:#8B93A1;line-height:1.5;}
+.session-box{margin:0 12px 10px 12px;padding:10px 12px;background:rgba(255,255,255,0.06);border-radius:9px;}
+.session-name{font-size:13px;font-weight:700;color:#fff;}
+.session-role{font-size:11px;color:#9FA9BA;margin-top:2px;}
+.session-logout{margin-top:8px;width:100%;background:rgba(255,255,255,0.08);border:none;color:#fff;padding:6px;border-radius:6px;font-size:11.5px;font-weight:600;}
+.session-logout:hover{background:rgba(255,255,255,0.16);}
+
+.main{flex:1;min-width:0;display:flex;flex-direction:column;overflow-y:auto;}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;}
+.topbar-title{font-size:19px;font-weight:700;}
+.topbar-sub{font-size:12px;color:var(--ink-faint);margin-top:2px;}
+.topbar-clock{display:flex;align-items:center;gap:8px;background:var(--accent-soft);color:var(--accent);padding:7px 14px;border-radius:20px;font-size:13px;font-weight:600;}
+.topbar-clock .dot{width:7px;height:7px;border-radius:50%;background:var(--in);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+.content{padding:24px 28px 60px 28px;max-width:1180px;width:100%;margin:0 auto;}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px;}
+.stat-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;}
+.stat-num{font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;}
+.stat-label{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+.stat-card.in .stat-num{color:var(--in);}
+.stat-card.out .stat-num{color:var(--out);}
+.stat-card.leave .stat-num{color:var(--leave);}
+
+.section-head{display:flex;align-items:center;justify-content:space-between;margin:26px 0 12px 0;}
+.section-head h2{font-size:16px;font-weight:700;margin:0;}
+.section-head .hint{font-size:12px;color:var(--ink-faint);}
+
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;transition:all .12s;}
+.btn:hover{border-color:var(--ink-faint);}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+.btn-primary:hover{opacity:.9;}
+.btn-in{background:var(--in);border-color:var(--in);color:#fff;}
+.btn-out{background:var(--out);border-color:var(--out);color:#fff;}
+.btn-ghost{background:none;border:none;color:var(--ink-soft);}
+.btn-danger{color:var(--warn);}
+.btn-sm{padding:5px 10px;font-size:12px;}
+.btn-full{width:100%;justify-content:center;}
+.btn:disabled{opacity:.45;cursor:not-allowed;}
+
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px;}
+.field label{font-size:12px;font-weight:600;color:var(--ink-soft);}
+.field input,.field select,.field textarea{border:1px solid var(--line);border-radius:7px;padding:9px 10px;font-size:13.5px;background:#fff;color:var(--ink);}
+.field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--accent);outline-offset:0;border-color:var(--accent);}
+.field textarea{resize:vertical;min-height:60px;}
+.field-hint{font-size:11px;color:var(--ink-faint);}
+
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.4px;color:var(--ink-faint);padding:9px 10px;border-bottom:1px solid var(--line);font-weight:700;}
+td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+.table-wrap{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:auto;box-shadow:var(--shadow);}
+.empty-row td{text-align:center;color:var(--ink-faint);padding:34px;font-size:13px;}
+
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:700;}
+.badge-present{background:var(--in-soft);color:var(--in);}
+.badge-late{background:var(--warn-soft);color:var(--warn);}
+.badge-working{background:var(--accent-soft);color:var(--accent);}
+.badge-leave{background:var(--leave-soft);color:var(--leave);}
+.badge-off{background:#EEF0F3;color:var(--ink-faint);}
+.badge-pending{background:var(--gold-soft);color:var(--gold);}
+.badge-admin{background:#1C2530;color:#fff;}
+.badge-branch{background:var(--accent-soft);color:var(--accent);}
+.badge-draft{background:#EEF0F3;color:var(--ink-soft);}
+.badge-approved{background:var(--in-soft);color:var(--in);}
+
+.avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;}
+.avatar.lg{width:64px;height:64px;font-size:20px;}
+
+.emp-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow);}
+.emp-top{display:flex;gap:10px;align-items:center;}
+.emp-name{font-weight:700;font-size:14px;}
+.emp-meta{font-size:12px;color:var(--ink-soft);}
+.emp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;}
+.punch-status{font-size:12px;color:var(--ink-soft);border-top:1px dashed var(--line);padding-top:9px;}
+.punch-actions{display:flex;gap:8px;}
+.locked-branch-tag{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);color:var(--accent);padding:8px 13px;border-radius:8px;font-size:13px;font-weight:600;}
+
+.doc-block{border:1px solid var(--line);border-radius:9px;padding:12px;margin-bottom:12px;background:#FAFBFC;}
+.doc-block-title{font-size:12.5px;font-weight:700;color:var(--ink-soft);margin-bottom:8px;}
+.doc-preview{display:flex;align-items:center;gap:10px;padding:8px 10px;background:#fff;border:1px solid var(--line);border-radius:7px;font-size:12.5px;}
+.doc-preview img{width:44px;height:44px;object-fit:cover;border-radius:5px;}
+.doc-icon{width:44px;height:44px;border-radius:5px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+
+.modal-backdrop{position:fixed;inset:0;background:rgba(28,37,48,0.5);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px;}
+.modal{background:#fff;border-radius:14px;max-width:420px;width:100%;padding:22px;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,0.25);}
+.modal.wide{max-width:640px;}
+.modal h3{margin:0 0 4px 0;font-size:17px;}
+.modal .sub{font-size:12.5px;color:var(--ink-soft);margin-bottom:16px;}
+.modal-clock{background:var(--accent-soft);color:var(--accent);border-radius:9px;padding:10px 12px;font-size:13px;font-weight:600;display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+.photo-drop{border:1.5px dashed var(--line);border-radius:10px;padding:16px;text-align:center;margin-bottom:12px;}
+.photo-preview{width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin-bottom:8px;}
+.modal-actions{display:flex;gap:8px;margin-top:16px;}
+.close-x{position:absolute;top:16px;right:18px;background:none;border:none;font-size:18px;color:var(--ink-faint);}
+
+.filter-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;}
+.filter-bar .field{margin-bottom:0;min-width:140px;}
+.search-input{border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:13px;width:220px;}
+.tag-locked{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--ink-faint);}
+
+.empty-state{text-align:center;padding:50px 20px;color:var(--ink-faint);}
+.empty-state .big{font-size:32px;margin-bottom:8px;}
+
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#1C2530 0%,#2B4C7E 100%);padding:20px;}
+.login-card{background:#fff;border-radius:16px;padding:34px;width:100%;max-width:380px;box-shadow:0 24px 70px rgba(0,0,0,0.35);}
+.login-brand{display:flex;align-items:center;gap:9px;margin-bottom:6px;}
+.login-title{font-size:13px;color:var(--ink-faint);margin-bottom:24px;}
+.login-error{background:var(--warn-soft);color:var(--warn);padding:9px 12px;border-radius:8px;font-size:12.5px;margin-bottom:14px;}
+.login-demo{margin-top:18px;padding-top:16px;border-top:1px dashed var(--line);font-size:11.5px;color:var(--ink-faint);line-height:1.7;}
+.login-demo code{background:var(--accent-soft);color:var(--accent);padding:1px 6px;border-radius:4px;font-weight:600;}
+
+.swatch-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+.swatch{width:52px;height:52px;border-radius:10px;border:2px solid transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;}
+.swatch.active{border-color:var(--ink);}
+.logo-row{display:flex;align-items:center;gap:14px;margin-bottom:16px;}
+.logo-preview{width:56px;height:56px;border-radius:10px;object-fit:cover;background:var(--accent-soft);}
+.logo-placeholder{width:56px;height:56px;border-radius:10px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px;}
+
+.code-box{background:#12181f;color:#B9C1CE;border-radius:9px;padding:14px;font-family:'Roboto Mono',monospace;font-size:11.5px;white-space:pre-wrap;line-height:1.6;overflow:auto;}
+
+.adj-row{display:flex;gap:6px;align-items:center;margin-top:4px;}
+.adj-row input{flex:1;padding:5px 7px;font-size:12px;border:1px solid var(--line);border-radius:6px;}
+.adj-list{font-size:11.5px;margin-top:6px;}
+.adj-list div{display:flex;justify-content:space-between;padding:2px 0;color:var(--ink-soft);}
+
+@media (max-width: 820px){
+  .app-body{flex-direction:column;}
+  .sidebar{position:fixed;bottom:0;left:0;right:0;width:100%;flex-direction:row;padding:6px 4px;z-index:20;overflow-x:auto;align-items:center;}
+  .brand,.sidebar-foot,.session-box{display:none;}
+  .nav{flex-direction:row;padding:0;gap:2px;width:100%;}
+  .nav-item{flex-direction:column;font-size:10px;padding:7px 4px;gap:3px;flex:1;white-space:nowrap;}
+  .nav-icon{font-size:16px;}
+  .main{padding-bottom:60px;}
+  .content{padding:16px;}
+  .form-grid{grid-template-columns:1fr;}
+  .topbar{padding:12px 16px;}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* =========================================================================
+   CLOUD CONFIG — fill these in with your own free Supabase project to get
+   real cross-browser / cross-device sync. Leave blank to use Claude's
+   built-in artifact storage instead (works only inside the Claude.ai tab).
+   See the setup instructions the assistant provided alongside this file.
+   ========================================================================= */
+const CLOUD_CONFIG = {
+  supabaseUrl: '',      // e.g. 'https://xxxxxxxx.supabase.co'
+  supabaseAnonKey: ''   // your project's public "anon" key
+};
+const CLOUD_ENABLED = !!(CLOUD_CONFIG.supabaseUrl && CLOUD_CONFIG.supabaseAnonKey);
+let CLOUD_ERROR = false;
+
+/* ============================= DATA LAYER ============================= */
+const KEYS = ['branches','shifts','employees','attendance','leaves','users','settings','payrollRuns'];
+let DB = {branches:[], shifts:[], employees:[], attendance:[], leaves:[], users:[], settings:null, payrollRuns:[]};
+
+const DEFAULT_SETTINGS = {companyName:'ShiftCard Retail', companyLogo:null, theme:'steel', standardWorkingDays:26, lateThreshold:3, lateFineAmount:200};
+const THEME_PRESETS = {
+  steel:{label:'Steel Blue', accent:'#2B4C7E', accentSoft:'#E8EEF7'},
+  forest:{label:'Forest Green', accent:'#2F6F4E', accentSoft:'#E5F2EA'},
+  plum:{label:'Plum', accent:'#7A4E9E', accentSoft:'#F0E9F8'},
+  amber:{label:'Charcoal Gold', accent:'#8A6D1B', accentSoft:'#FBF3DE'},
+  rose:{label:'Rose', accent:'#B0466E', accentSoft:'#FBE9F0'}
+};
+
+const STORAGE_AVAILABLE = (typeof window.storage !== 'undefined' && typeof window.storage.get === 'function' && typeof window.storage.set === 'function');
+let CURRENT_USER = null; /* session lives in memory only */
+let LOGIN_ERROR = '';
+
+let UI = {
+  tab:'dashboard', punchBranch:'all', punchSearch:'',
+  reportFilters:{branch:'all', employee:'all', from: todayStr(), to: todayStr()},
+  leaveFilters:{branch:'all', status:'all'}, empFilterBranch:'all',
+  payroll:{branchId:null, month: monthStr()},
+  modal:null
+};
+
+function uid(p){ return p+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function monthStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function fmtTime(iso){ if(!iso) return '—'; const d=new Date(iso); let h=d.getHours(); const m=String(d.getMinutes()).padStart(2,'0'); const ap=h>=12?'PM':'AM'; h=h%12; if(h===0)h=12; return h+':'+m+' '+ap; }
+function fmtDateNice(ds){ if(!ds) return '—'; const d=new Date(ds+'T00:00:00'); return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}); }
+function fmtDateShort(ds){ const d=new Date(ds+'T00:00:00'); return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
+function fmtDateTime(iso){ if(!iso) return '—'; const d=new Date(iso); return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+fmtTime(iso); }
+function initials(name){ if(!name) return '?'; return name.trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
+function esc(s){ return (s||'').toString().replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function money(n){ if(n===undefined||n===null||n==='') return '0'; return Number(n).toLocaleString(undefined,{maximumFractionDigits:0}); }
+
+function isAdmin(){ return CURRENT_USER && CURRENT_USER.role==='admin'; }
+function myBranchId(){ return CURRENT_USER ? CURRENT_USER.branchId : null; }
+
+/* ---- unified storage: Supabase (if configured) → Claude artifact storage → in-memory only ---- */
+function cloudHeaders(){ return {apikey: CLOUD_CONFIG.supabaseAnonKey, Authorization:'Bearer '+CLOUD_CONFIG.supabaseAnonKey, 'Content-Type':'application/json'}; }
+async function storageGet(key){
+  if(CLOUD_ENABLED){
+    try{
+      const res = await fetch(`${CLOUD_CONFIG.supabaseUrl}/rest/v1/kv_store?key=eq.${encodeURIComponent(key)}&select=value`, {headers: cloudHeaders()});
+      if(!res.ok) throw new Error('cloud read '+res.status);
+      const arr = await res.json();
+      return (arr && arr[0]) ? arr[0].value : null;
+    }catch(e){ console.error('cloud get failed', key, e); CLOUD_ERROR = true; return null; }
+  } else if(STORAGE_AVAILABLE){
+    try{ const r = await window.storage.get(key, true); return (r && r.value) ? JSON.parse(r.value) : null; }
+    catch(e){ return null; }
+  }
+  return null;
+}
+async function storageSet(key, value){
+  if(CLOUD_ENABLED){
+    try{
+      const res = await fetch(`${CLOUD_CONFIG.supabaseUrl}/rest/v1/kv_store`, {
+        method:'POST',
+        headers: Object.assign({'Prefer':'resolution=merge-duplicates,return=minimal'}, cloudHeaders()),
+        body: JSON.stringify([{key, value, updated_at: new Date().toISOString()}])
+      });
+      if(!res.ok) throw new Error('cloud write '+res.status);
+      return true;
+    }catch(e){ console.error('cloud set failed', key, e); CLOUD_ERROR = true; return false; }
+  } else if(STORAGE_AVAILABLE){
+    try{ await window.storage.set(key, JSON.stringify(value), true); return true; }
+    catch(e){ return false; }
+  }
+  return false;
+}
+
+async function loadDB(){
+  let allEmpty = true;
+  for(const k of KEYS){
+    const v = await storageGet(k);
+    DB[k] = v;
+    if(k==='settings'){ if(!DB.settings) DB.settings = null; }
+    else{ DB[k] = v || []; if(DB[k].length>0) allEmpty=false; }
+  }
+  if(!DB.settings){ DB.settings = Object.assign({}, DEFAULT_SETTINGS); allEmpty = allEmpty; }
+  if(allEmpty && !DB.settings.seeded){
+    seedDemo();
+    DB.settings.seeded = true;
+    await saveAll();
+  }
+  applyTheme();
+  render();
+}
+async function saveKey(k){ const ok = await storageSet(k, DB[k]); if(!ok) flashSaveWarning(); return ok; }
+async function saveAll(){ for(const k of KEYS) await saveKey(k); }
+
+let saveWarnTimer = null;
+function flashSaveWarning(){
+  const el = document.getElementById('saveBanner');
+  if(el){ el.style.display='block'; clearTimeout(saveWarnTimer); saveWarnTimer = setTimeout(()=>{ if(el) el.style.display='none'; }, 6000); }
+}
+
+function seedDemo(){
+  const b1 = {id:uid('br'), name:'Downtown Store', location:'MG Road, Bengaluru', manager:'Asha Rao', phone:'9880011223'};
+  const b2 = {id:uid('br'), name:'Airport Outlet', location:'Terminal 2, Bengaluru', manager:'Vikram Shah', phone:'9880099887'};
+  DB.branches = [b1,b2];
+  const s1 = {id:uid('sh'), name:'Morning Shift', start:'09:00', end:'18:00', grace:15};
+  const s2 = {id:uid('sh'), name:'Evening Shift', start:'13:00', end:'22:00', grace:15};
+  DB.shifts = [s1,s2];
+  DB.employees = [
+    {id:uid('emp'), code:'EMP-1001', name:'Rahul Mehta', role:'Sales Associate', phone:'9812345670', branchId:b1.id, shiftId:s1.id, joinDate:'2024-03-01', status:'Active', photo:null, salary:32000, targetHours:8},
+    {id:uid('emp'), code:'EMP-1002', name:'Priya Nair', role:'Cashier', phone:'9812345671', branchId:b1.id, shiftId:s2.id, joinDate:'2024-06-15', status:'Active', photo:null, salary:28000, targetHours:8},
+    {id:uid('emp'), code:'EMP-1003', name:'Karan Suri', role:'Store Assistant', phone:'9812345672', branchId:b2.id, shiftId:s1.id, joinDate:'2025-01-10', status:'Active', photo:null, salary:26000, targetHours:8}
+  ];
+  DB.attendance = [];
+  DB.leaves = [];
+  DB.payrollRuns = [];
+  DB.users = [
+    {id:uid('usr'), username:'admin', password:'admin123', role:'admin', branchId:null, name:'Head Office Admin'},
+    {id:uid('usr'), username:'downtown.mgr', password:'branch123', role:'branch', branchId:b1.id, name:'Downtown Branch Manager'},
+    {id:uid('usr'), username:'airport.mgr', password:'branch123', role:'branch', branchId:b2.id, name:'Airport Branch Manager'}
+  ];
+  if(!DB.settings) DB.settings = Object.assign({}, DEFAULT_SETTINGS);
+}
+
+/* ============================= HELPERS ============================= */
+function branchName(id){ const b=DB.branches.find(x=>x.id===id); return b?b.name:'—'; }
+function shiftById(id){ return DB.shifts.find(x=>x.id===id); }
+function empById(id){ return DB.employees.find(x=>x.id===id); }
+function employeesOfBranch(bid){ return DB.employees.filter(e=> bid==='all' || e.branchId===bid); }
+function visibleBranches(){ return isAdmin() ? DB.branches : DB.branches.filter(b=>b.id===myBranchId()); }
+function visibleEmployees(){ return isAdmin() ? DB.employees : DB.employees.filter(e=>e.branchId===myBranchId()); }
+
+function openRecordFor(empId){ return DB.attendance.filter(r=>r.employeeId===empId && !r.punchOut).sort((a,b)=> new Date(b.punchIn)-new Date(a.punchIn))[0] || null; }
+function todaysRecords(empId, date){ return DB.attendance.filter(r=>r.employeeId===empId && r.date===(date||todayStr())); }
+function hoursWorked(rec){
+  if(!rec.punchIn || !rec.punchOut) return null;
+  const ms = new Date(rec.punchOut) - new Date(rec.punchIn);
+  if(ms<0) return null;
+  const h = Math.floor(ms/3600000); const m = Math.round((ms%3600000)/60000);
+  return {h,m,decimal: ms/3600000};
+}
+function fmtHM(hm){ if(!hm) return '—'; return hm.h+'h '+hm.m+'m'; }
+function computeStatus(rec){
+  const shift = shiftById(rec.shiftId);
+  let status = rec.punchOut ? 'Present' : 'Working';
+  if(shift){
+    const [sh,sm] = shift.start.split(':').map(Number);
+    const shiftStart = new Date(rec.date+'T00:00:00'); shiftStart.setHours(sh,sm,0,0);
+    const grace = shift.grace||0;
+    const inT = new Date(rec.punchIn);
+    if(inT.getTime() > shiftStart.getTime() + grace*60000) status = rec.punchOut ? 'Late' : 'Late (working)';
+  }
+  return status;
+}
+function statusBadgeClass(status){
+  if(status.startsWith('Late')) return 'badge-late';
+  if(status==='Present') return 'badge-present';
+  if(status.includes('working')||status==='Working') return 'badge-working';
+  return 'badge-off';
+}
+function leaveOnDate(empId, dateStr){ return DB.leaves.find(l=> l.employeeId===empId && l.status==='Approved' && dateStr>=l.from && dateStr<=l.to); }
+
+function compressImage(file, maxW, quality){
+  maxW = maxW||360; quality = quality||0.62;
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxW/img.width);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1,Math.round(img.width*scale));
+        canvas.height = Math.max(1,Math.round(img.height*scale));
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img,0,0,canvas.width,canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = ()=>reject(new Error('img load fail'));
+      img.src = e.target.result;
+    };
+    reader.onerror = ()=>reject(new Error('read fail'));
+    reader.readAsDataURL(file);
+  });
+}
+function readFileAsDataURL(file){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = ()=>reject(new Error('read fail'));
+    reader.readAsDataURL(file);
+  });
+}
+async function loadEmpDocs(employeeId){
+  const v = await storageGet('attach:'+employeeId);
+  return v || {idDoc:null, idDocName:null, contract:null, contractName:null};
+}
+async function saveEmpDocs(employeeId, docs){ return storageSet('attach:'+employeeId, docs); }
+
+function applyTheme(){
+  const t = THEME_PRESETS[DB.settings?.theme] || THEME_PRESETS.steel;
+  document.documentElement.style.setProperty('--accent', t.accent);
+  document.documentElement.style.setProperty('--accent-soft', t.accentSoft);
+}
+
+/* ============================= PAYROLL LOGIC ============================= */
+function countDaysInMonth(fromStr, toStr, mStr){
+  const [y,m] = mStr.split('-').map(Number);
+  const monthStart = new Date(y, m-1, 1); const monthEnd = new Date(y, m, 0);
+  const from = new Date(fromStr+'T00:00:00'); const to = new Date(toStr+'T00:00:00');
+  const start = from>monthStart?from:monthStart; const end = to<monthEnd?to:monthEnd;
+  if(end<start) return 0;
+  return Math.round((end-start)/86400000)+1;
+}
+function computePayrollLines(branchId, mStr){
+  const settings = DB.settings;
+  const emps = DB.employees.filter(e=>e.branchId===branchId && e.status!=='Inactive');
+  return emps.map(e=>{
+    const baseSalary = Number(e.salary)||0;
+    const perDayRate = settings.standardWorkingDays>0 ? baseSalary/settings.standardWorkingDays : 0;
+    const monthRecords = DB.attendance.filter(r=>r.employeeId===e.id && r.date.indexOf(mStr)===0);
+    const presentDays = new Set(monthRecords.map(r=>r.date)).size;
+    const lateDates = new Set(monthRecords.filter(r=>computeStatus(r).startsWith('Late')).map(r=>r.date));
+    const lateDayCount = lateDates.size;
+    const fineCount = Math.max(0, lateDayCount - (settings.lateThreshold||0));
+    const fineAmount = fineCount * (settings.lateFineAmount||0);
+    let paidLeaveDays = 0;
+    DB.leaves.filter(l=>l.employeeId===e.id && l.status==='Approved' && l.type!=='Unpaid').forEach(l=>{ paidLeaveDays += countDaysInMonth(l.from, l.to, mStr); });
+    const gross = perDayRate*(presentDays+paidLeaveDays);
+    return {employeeId:e.id, baseSalary, perDayRate, presentDays, paidLeaveDays, lateDayCount, fineCount, fineAmount, adjustments:[], gross: Math.round(gross), net: Math.round(gross-fineAmount)};
+  });
+}
+function recalcLine(line){
+  const adjTotal = (line.adjustments||[]).reduce((s,a)=>s+Number(a.amount||0),0);
+  line.net = Math.round(line.gross - line.fineAmount + adjTotal);
+  return line;
+}
+function findPayrollRun(branchId, mStr){ return DB.payrollRuns.find(r=>r.branchId===branchId && r.month===mStr); }
+
+/* ============================= RENDER SHELL ============================= */
+function baseNav(){
+  const nav = [
+    {id:'dashboard', label:'Dashboard', icon:'&#9737;'},
+    {id:'punch', label:'Punch', icon:'&#128340;'},
+    {id:'employees', label:'Employees', icon:'&#128100;'},
+  ];
+  if(isAdmin()) nav.push({id:'branches', label:'Branches', icon:'&#127970;'});
+  nav.push({id:'shifts', label:'Shifts', icon:'&#128197;'});
+  nav.push({id:'leaves', label:'Leaves', icon:'&#9992;'});
+  nav.push({id:'payroll', label:'Payroll', icon:'&#128176;'});
+  nav.push({id:'reports', label:'Reports', icon:'&#128202;'});
+  if(isAdmin()) nav.push({id:'users', label:'Users', icon:'&#128274;'});
+  if(isAdmin()) nav.push({id:'settings', label:'Settings', icon:'&#9881;'});
+  return nav;
+}
+
+function render(){
+  const app = document.getElementById('app');
+  if(!CURRENT_USER){ renderLogin(); return; }
+  const NAV = baseNav();
+  if(!NAV.find(n=>n.id===UI.tab)) UI.tab = 'dashboard';
+  const cName = esc(DB.settings.companyName || 'ShiftCard Retail');
+  const cLogo = DB.settings.companyLogo;
+  app.innerHTML = `
+    ${!CLOUD_ENABLED && !STORAGE_AVAILABLE ? `<div class="banner warn">This window has no connected storage — changes exist only until you close this tab. Open the app from Claude's artifact panel, or set up cloud sync in Settings.</div>` : ''}
+    ${!CLOUD_ENABLED && STORAGE_AVAILABLE ? `<div class="banner info">Running on Claude's built-in storage — shared with everyone on this artifact, but won't sync to a copy opened outside Claude.ai. Connect Supabase in Settings for real cross-device sync.</div>` : ''}
+    ${CLOUD_ENABLED && CLOUD_ERROR ? `<div class="banner warn">Cloud sync error — check the Supabase URL/key in the code. Working from memory for now; changes may not be saved.</div>` : ''}
+    ${CLOUD_ENABLED && !CLOUD_ERROR ? `<div class="banner ok" id="saveBanner" style="display:none;">Couldn't reach the cloud database just now — please check your connection and try again.</div>` : ''}
+    <div class="app-body">
+      <div class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">
+            ${cLogo ? `<img class="brand-logo" src="${cLogo}">` : `<div class="brand-dot"></div>`}
+            <div class="brand-name">${cName}</div>
+          </div>
+          <div class="brand-sub">Powered by ShiftCard</div>
+        </div>
+        <div class="session-box">
+          <div class="session-name">${esc(CURRENT_USER.name)}</div>
+          <div class="session-role">${isAdmin() ? 'Admin · all branches' : 'Branch manager · '+esc(branchName(CURRENT_USER.branchId))}</div>
+          <button class="session-logout" onclick="logout()">Log out</button>
+        </div>
+        <div class="nav">
+          ${NAV.map(n=>`<button class="nav-item ${UI.tab===n.id?'active':''}" onclick="setTab('${n.id}')"><span class="nav-icon">${n.icon}</span><span>${n.label}</span></button>`).join('')}
+        </div>
+        <div class="sidebar-foot">${CLOUD_ENABLED?'Cloud sync connected.':'Data is shared across everyone using this app link.'}</div>
+      </div>
+      <div class="main">
+        <div class="topbar">
+          <div>
+            <div class="topbar-title">${NAV.find(n=>n.id===UI.tab).label}</div>
+            <div class="topbar-sub">${isAdmin() ? 'Viewing all branches' : 'Viewing '+esc(branchName(CURRENT_USER.branchId))}</div>
+          </div>
+          <div class="topbar-clock"><span class="dot"></span><span id="liveClock" class="mono"></span></div>
+        </div>
+        <div class="content" id="content"></div>
+      </div>
+    </div>
+    <div id="modalRoot"></div>
+  `;
+  tickClock();
+  renderTab();
+}
+
+function renderLogin(){
+  const app = document.getElementById('app');
+  const cName = esc(DB.settings?.companyName || 'ShiftCard Retail');
+  const cLogo = DB.settings?.companyLogo;
+  app.innerHTML = `
+    <div class="login-wrap">
+      <div class="login-card">
+        <div class="login-brand">${cLogo?`<img class="brand-logo" src="${cLogo}">`:`<div class="brand-dot"></div>`}<div class="brand-name" style="font-size:20px;">${cName}</div></div>
+        <div class="login-title">Sign in to manage attendance &amp; payroll</div>
+        ${LOGIN_ERROR ? `<div class="login-error">${esc(LOGIN_ERROR)}</div>` : ''}
+        ${!CLOUD_ENABLED && !STORAGE_AVAILABLE ? `<div class="login-error" style="background:var(--gold-soft);color:var(--gold);">No storage detected in this window — your changes here won't be saved anywhere. Open this app inside Claude.ai, or connect Supabase.</div>` : ''}
+        <div class="field"><label>Username</label><input id="log_user" placeholder="e.g. admin" onkeydown="if(event.key==='Enter') attemptLogin()"></div>
+        <div class="field"><label>Password</label><input id="log_pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter') attemptLogin()"></div>
+        <button class="btn btn-primary btn-full" onclick="attemptLogin()">Sign in</button>
+        <div class="login-demo">
+          Demo accounts seeded on first run:<br>
+          Admin — <code>admin</code> / <code>admin123</code><br>
+          Downtown branch — <code>downtown.mgr</code> / <code>branch123</code><br>
+          Airport branch — <code>airport.mgr</code> / <code>branch123</code>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('log_user')?.focus();
+}
+function attemptLogin(){
+  const u = (document.getElementById('log_user').value||'').trim();
+  const p = document.getElementById('log_pass').value||'';
+  const user = DB.users.find(x=>x.username.toLowerCase()===u.toLowerCase() && x.password===p);
+  if(!user){ LOGIN_ERROR = 'Incorrect username or password.'; renderLogin(); return; }
+  LOGIN_ERROR = '';
+  CURRENT_USER = user;
+  UI.tab = 'dashboard';
+  if(!isAdmin()) UI.punchBranch = user.branchId;
+  render();
+}
+function logout(){ CURRENT_USER = null; render(); }
+function tickClock(){ const el = document.getElementById('liveClock'); if(!el) return; const d = new Date(); el.textContent = d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) + '  ' + fmtTime(d.toISOString()); }
+setInterval(()=>{ tickClock(); const mc=document.getElementById('modalClock'); if(mc) mc.textContent = fmtTime(new Date().toISOString()); }, 1000);
+function setTab(t){ UI.tab=t; if(!isAdmin() && t==='punch') UI.punchBranch = myBranchId(); render(); }
+
+function renderTab(){
+  const c = document.getElementById('content');
+  if(UI.tab==='dashboard') c.innerHTML = renderDashboard();
+  else if(UI.tab==='punch') c.innerHTML = renderPunch();
+  else if(UI.tab==='employees') c.innerHTML = renderEmployees();
+  else if(UI.tab==='branches' && isAdmin()) c.innerHTML = renderBranches();
+  else if(UI.tab==='shifts') c.innerHTML = renderShifts();
+  else if(UI.tab==='leaves') c.innerHTML = renderLeaves();
+  else if(UI.tab==='payroll') c.innerHTML = renderPayroll();
+  else if(UI.tab==='reports') c.innerHTML = renderReports();
+  else if(UI.tab==='users' && isAdmin()) c.innerHTML = renderUsers();
+  else if(UI.tab==='settings' && isAdmin()) c.innerHTML = renderSettings();
+}
+
+/* ============================= DASHBOARD ============================= */
+function renderDashboard(){
+  const today = todayStr();
+  const empPool = visibleEmployees().filter(e=>e.status!=='Inactive');
+  const totalEmp = empPool.length;
+  const empIds = new Set(empPool.map(e=>e.id));
+  const todaysAtt = DB.attendance.filter(r=>r.date===today && empIds.has(r.employeeId));
+  const uniqueInToday = new Set(todaysAtt.map(r=>r.employeeId)).size;
+  const stillWorking = todaysAtt.filter(r=>!r.punchOut).length;
+  const onLeaveToday = empPool.filter(e=> leaveOnDate(e.id, today)).length;
+  const absent = Math.max(0, totalEmp - uniqueInToday - onLeaveToday);
+
+  const branchRows = visibleBranches().map(b=>{
+    const emps = employeesOfBranch(b.id).filter(e=>e.status!=='Inactive');
+    const present = new Set(DB.attendance.filter(r=>r.date===today && r.branchId===b.id).map(r=>r.employeeId)).size;
+    const leave = emps.filter(e=>leaveOnDate(e.id,today)).length;
+    return `<tr><td><strong>${esc(b.name)}</strong><div class="emp-meta">${esc(b.location||'')}</div></td><td>${emps.length}</td><td><span class="badge badge-present">${present} in</span></td><td><span class="badge badge-leave">${leave} leave</span></td><td>${Math.max(0,emps.length-present-leave)}</td></tr>`;
+  }).join('');
+
+  return `
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-num">${totalEmp}</div><div class="stat-label">Active staff</div></div>
+      <div class="stat-card"><div class="stat-num">${visibleBranches().length}</div><div class="stat-label">Branch${isAdmin()?'es':''}</div></div>
+      <div class="stat-card in"><div class="stat-num">${uniqueInToday}</div><div class="stat-label">Punched in today</div></div>
+      <div class="stat-card"><div class="stat-num">${stillWorking}</div><div class="stat-label">Currently on shift</div></div>
+      <div class="stat-card leave"><div class="stat-num">${onLeaveToday}</div><div class="stat-label">On leave today</div></div>
+      <div class="stat-card out"><div class="stat-num">${absent}</div><div class="stat-label">Not marked / absent</div></div>
+    </div>
+    <div class="section-head"><h2>${isAdmin()?'Branch snapshot':'Your branch'} — ${fmtDateNice(today)}</h2></div>
+    <div class="table-wrap"><table><thead><tr><th>Branch</th><th>Staff</th><th>Present</th><th>On leave</th><th>Unmarked</th></tr></thead>
+      <tbody>${branchRows || `<tr class="empty-row"><td colspan="5">No branch to show.</td></tr>`}</tbody></table></div>
+    <div class="section-head"><h2>Recent punches</h2></div>
+    <div class="table-wrap"><table><thead><tr><th>Employee</th><th>Branch</th><th>In</th><th>Out</th><th>Status</th></tr></thead>
+      <tbody>${DB.attendance.filter(r=>empIds.has(r.employeeId)).slice().sort((a,b)=>new Date(b.punchIn)-new Date(a.punchIn)).slice(0,8).map(r=>{
+        const e = empById(r.employeeId); const status=computeStatus(r);
+        return `<tr><td>${esc(e?e.name:'Unknown')}</td><td>${esc(branchName(r.branchId))}</td><td class="mono">${fmtTime(r.punchIn)}</td><td class="mono">${fmtTime(r.punchOut)}</td><td><span class="badge ${statusBadgeClass(status)}">${status}</span></td></tr>`;
+      }).join('') || `<tr class="empty-row"><td colspan="5">No punches recorded yet. Head to the Punch tab.</td></tr>`}</tbody></table></div>
+  `;
+}
+
+/* ============================= PUNCH ============================= */
+function renderPunch(){
+  const today = todayStr();
+  const branches = visibleBranches();
+  const branchSelector = isAdmin()
+    ? `<div class="field"><label>Branch</label><select onchange="UI.punchBranch=this.value;renderTab()"><option value="all">All branches</option>${branches.map(b=>`<option value="${b.id}" ${UI.punchBranch===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}</select></div>`
+    : `<div class="locked-branch-tag">&#127970; ${esc(branchName(myBranchId()))}</div>`;
+  let emps = employeesOfBranch(isAdmin()?UI.punchBranch:myBranchId()).filter(e=>e.status!=='Inactive');
+  if(UI.punchSearch.trim()){ const q = UI.punchSearch.toLowerCase(); emps = emps.filter(e=> e.name.toLowerCase().includes(q) || (e.code||'').toLowerCase().includes(q)); }
+  const cards = emps.map(e=>{
+    const open = openRecordFor(e.id); const todays = todaysRecords(e.id, today); const shift = shiftById(e.shiftId); const onLeave = leaveOnDate(e.id, today);
+    let statusChip;
+    if(open) statusChip = `<span class="badge badge-working">On shift since ${fmtTime(open.punchIn)}</span>`;
+    else if(todays.length) statusChip = `<span class="badge badge-present">Completed · ${fmtHM(hoursWorked(todays[todays.length-1]))}</span>`;
+    else if(onLeave) statusChip = `<span class="badge badge-leave">On leave (${esc(onLeave.type)})</span>`;
+    else statusChip = `<span class="badge badge-off">Not punched today</span>`;
+    return `<div class="emp-card"><div class="emp-top">${e.photo ? `<img class="avatar" src="${e.photo}">` : `<div class="avatar">${initials(e.name)}</div>`}<div><div class="emp-name">${esc(e.name)}</div><div class="emp-meta">${esc(e.role||'')} · ${esc(branchName(e.branchId))}</div><div class="emp-meta">${shift? esc(shift.name)+' · '+shift.start+'–'+shift.end : 'No shift assigned'}</div></div></div><div class="punch-status">${statusChip}</div><div class="punch-actions">${open ? `<button class="btn btn-out btn-full" onclick="openPunchModal('${e.id}','out')">Punch Out</button>` : `<button class="btn btn-in btn-full" ${onLeave?'disabled title="Marked on leave today"':''} onclick="openPunchModal('${e.id}','in')">Punch In</button>`}</div></div>`;
+  }).join('');
+  return `<div class="filter-bar">${branchSelector}<div class="field"><label>Search staff</label><input class="search-input" placeholder="Name or code…" value="${esc(UI.punchSearch)}" oninput="UI.punchSearch=this.value;renderTab()"></div><div class="tag-locked" style="margin-left:auto;align-self:center;">&#128274; Punch times are captured automatically at the moment you confirm.</div></div><div class="emp-grid">${cards || `<div class="empty-state"><div class="big">🕓</div>No staff found for this filter.</div>`}</div>`;
+}
+function openPunchModal(empId, direction){ UI.modal = {type:'punch', empId, direction, photo:null, note:''}; renderModal(); }
+function renderModal(){
+  const root = document.getElementById('modalRoot');
+  if(!UI.modal){ root.innerHTML=''; return; }
+  if(UI.modal.type==='punch'){
+    const e = empById(UI.modal.empId); const dir = UI.modal.direction;
+    root.innerHTML = `<div class="modal-backdrop" onclick="if(event.target===this) closeModal()"><div class="modal" style="position:relative;"><button class="close-x" onclick="closeModal()">&times;</button><h3>${dir==='in'?'Punch In':'Punch Out'} — ${esc(e.name)}</h3><div class="sub">${esc(branchName(e.branchId))} · ${esc(e.role||'')}</div><div class="modal-clock"><span>This action will record</span><span id="modalClock" class="mono">${fmtTime(new Date().toISOString())}</span></div><div class="photo-drop" id="photoDrop">${UI.modal.photo ? `<img class="photo-preview" src="${UI.modal.photo}"><div style="font-size:12px;color:var(--ink-soft);margin-bottom:6px;">Photo captured</div>` : `<div style="font-size:24px;margin-bottom:6px;">&#128247;</div><div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:10px;">Optional: attach a photo for verification</div>`}<input type="file" accept="image/*" capture="environment" id="photoInput" style="display:none" onchange="handlePhotoPick(event)"><button class="btn btn-sm" onclick="document.getElementById('photoInput').click()">${UI.modal.photo?'Retake photo':'Take / upload photo'}</button>${UI.modal.photo ? `<button class="btn btn-sm btn-ghost" onclick="UI.modal.photo=null;renderModal()">Remove</button>` : ''}</div><div class="field"><label>Note (optional)</label><input placeholder="e.g. late due to traffic" value="${esc(UI.modal.note)}" oninput="UI.modal.note=this.value"></div><div class="modal-actions"><button class="btn" style="flex:1" onclick="closeModal()">Cancel</button><button class="btn ${dir==='in'?'btn-in':'btn-out'}" style="flex:1" onclick="confirmPunch()">Confirm ${dir==='in'?'Punch In':'Punch Out'}</button></div></div></div>`;
+  } else if(UI.modal.type==='employee'){ renderEmployeeModal(); }
+  else if(UI.modal.type==='branch'){ renderBranchModal(); }
+  else if(UI.modal.type==='shift'){ renderShiftModal(); }
+  else if(UI.modal.type==='leave'){ renderLeaveModal(); }
+  else if(UI.modal.type==='user'){ renderUserModal(); }
+  else if(UI.modal.type==='adjustment'){ renderAdjustmentModal(); }
+}
+function closeModal(){ UI.modal=null; renderModal(); }
+async function handlePhotoPick(ev){ const file = ev.target.files[0]; if(!file) return; try{ UI.modal.photo = await compressImage(file, 360, 0.6); renderModal(); }catch(err){ alert('Could not read photo, try again.'); } }
+async function confirmPunch(){
+  const e = empById(UI.modal.empId); const now = new Date().toISOString();
+  if(UI.modal.direction==='in'){
+    DB.attendance.push({id: uid('att'), employeeId: e.id, branchId: e.branchId, shiftId: e.shiftId, date: todayStr(), punchIn: now, punchInPhoto: UI.modal.photo, punchOut: null, punchOutPhoto: null, note: UI.modal.note || ''});
+  } else {
+    const open = openRecordFor(e.id);
+    if(open){ open.punchOut = now; open.punchOutPhoto = UI.modal.photo; if(UI.modal.note) open.note = (open.note? open.note+' | ':'') + UI.modal.note; }
+  }
+  await saveKey('attendance'); closeModal(); renderTab();
+}
+
+/* ============================= EMPLOYEES ============================= */
+function renderEmployees(){
+  const branches = visibleBranches();
+  const branchSelector = isAdmin()
+    ? `<div class="field"><label>Branch</label><select onchange="UI.empFilterBranch=this.value;renderTab()"><option value="all">All branches</option>${branches.map(b=>`<option value="${b.id}" ${UI.empFilterBranch===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}</select></div>`
+    : `<div class="locked-branch-tag">&#127970; ${esc(branchName(myBranchId()))}</div>`;
+  const list = isAdmin() ? employeesOfBranch(UI.empFilterBranch) : employeesOfBranch(myBranchId());
+  const rows = list.map(e=>{
+    const shift = shiftById(e.shiftId);
+    return `<tr><td style="display:flex;align-items:center;gap:10px;">${e.photo? `<img class="avatar" src="${e.photo}">` : `<div class="avatar">${initials(e.name)}</div>`}<div><div style="font-weight:600;">${esc(e.name)}</div><div class="emp-meta">${esc(e.code||'')}</div></div></td><td>${esc(e.role||'—')}</td><td>${esc(branchName(e.branchId))}</td><td>${shift? esc(shift.name) : '—'}</td><td>${e.salary? money(e.salary) : '—'}</td><td>${e.targetHours? e.targetHours+'h/day' : '—'}</td><td><span class="badge ${e.status==='Inactive'?'badge-off':'badge-present'}">${e.status||'Active'}</span></td><td><button class="btn btn-sm" onclick="editEmployee('${e.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteEmployee('${e.id}')">Delete</button></td></tr>`;
+  }).join('');
+  return `<div class="filter-bar">${branchSelector}<button class="btn btn-primary" style="margin-left:auto" onclick="editEmployee(null)">+ Add employee</button></div><div class="table-wrap"><table><thead><tr><th>Employee</th><th>Role</th><th>Branch</th><th>Shift</th><th>Salary</th><th>Target hrs</th><th>Status</th><th></th></tr></thead><tbody>${rows || `<tr class="empty-row"><td colspan="8">No employees yet. Add your first staff member.</td></tr>`}</tbody></table></div>`;
+}
+function editEmployee(id){
+  const defaultBranch = isAdmin() ? (DB.branches[0]?.id||'') : myBranchId();
+  const e = id ? empById(id) : {id:null, code:'', name:'', role:'', phone:'', branchId: defaultBranch, shiftId:'', joinDate: todayStr(), status:'Active', photo:null, salary:'', targetHours:8};
+  UI.modal = {type:'employee', data: Object.assign({}, e), docs:{idDoc:null, idDocName:null, contract:null, contractName:null}, docsLoaded: !id};
+  renderModal();
+  if(id){ loadEmpDocs(id).then(docs=>{ if(UI.modal && UI.modal.type==='employee' && UI.modal.data.id===id){ UI.modal.docs = docs; UI.modal.docsLoaded = true; renderModal(); } }); }
+}
+function renderEmployeeModal(){
+  const d = UI.modal.data; const docs = UI.modal.docs;
+  const branchOpts = isAdmin() ? DB.branches.map(b=>`<option value="${b.id}" ${d.branchId===b.id?'selected':''}>${esc(b.name)}</option>`).join('') : `<option value="${myBranchId()}" selected>${esc(branchName(myBranchId()))}</option>`;
+  document.getElementById('modalRoot').innerHTML = `<div class="modal-backdrop" onclick="if(event.target===this) closeModal()"><div class="modal" style="position:relative;max-width:480px;"><button class="close-x" onclick="closeModal()">&times;</button><h3>${d.id?'Edit employee':'Add employee'}</h3><div class="sub">Staff details, shift, pay and documents</div>
+    <div style="display:flex;gap:14px;align-items:center;margin-bottom:14px;">${d.photo? `<img class="avatar lg" src="${d.photo}">` : `<div class="avatar lg">${initials(d.name||'?')}</div>`}<div><input type="file" accept="image/*" capture="environment" id="empPhotoInput" style="display:none" onchange="handleEmpPhotoPick(event)"><button class="btn btn-sm" onclick="document.getElementById('empPhotoInput').click()">Upload profile photo</button></div></div>
+    <div class="form-grid">
+      <div class="field"><label>Full name</label><input id="f_name" value="${esc(d.name)}"></div>
+      <div class="field"><label>Employee code</label><input id="f_code" value="${esc(d.code)}" placeholder="EMP-1004"></div>
+      <div class="field"><label>Role / designation</label><input id="f_role" value="${esc(d.role)}" placeholder="Sales Associate"></div>
+      <div class="field"><label>Phone</label><input id="f_phone" value="${esc(d.phone)}"></div>
+      <div class="field"><label>Branch</label><select id="f_branch" ${isAdmin()?'':'disabled'}>${branchOpts}</select></div>
+      <div class="field"><label>Default shift</label><select id="f_shift"><option value="">— none —</option>${DB.shifts.map(s=>`<option value="${s.id}" ${d.shiftId===s.id?'selected':''}>${esc(s.name)} (${s.start}-${s.end})</option>`).join('')}</select></div>
+      <div class="field"><label>Join date</label><input type="date" id="f_join" value="${d.joinDate||''}"></div>
+      <div class="field"><label>Status</label><select id="f_status"><option ${d.status==='Active'?'selected':''}>Active</option><option ${d.status==='Inactive'?'selected':''}>Inactive</option></select></div>
+      <div class="field"><label>Monthly salary</label><input type="number" min="0" id="f_salary" value="${d.salary!==undefined?d.salary:''}" placeholder="e.g. 30000"></div>
+      <div class="field"><label>Target working hours / day</label><input type="number" min="0" step="0.5" id="f_hours" value="${d.targetHours!==undefined?d.targetHours:8}"></div>
+    </div>
+    <div class="doc-block"><div class="doc-block-title">CNIC / PASSPORT</div>${!UI.modal.docsLoaded ? `<div class="field-hint">Loading…</div>` : docPreviewOrUpload('idDoc', docs)}</div>
+    <div class="doc-block"><div class="doc-block-title">EMPLOYMENT CONTRACT</div>${!UI.modal.docsLoaded ? `<div class="field-hint">Loading…</div>` : docPreviewOrUpload('contract', docs)}</div>
+    <div class="modal-actions"><button class="btn" style="flex:1" onclick="closeModal()">Cancel</button><button class="btn btn-primary" style="flex:1" onclick="saveEmployee()">Save employee</button></div>
+  </div></div>`;
+}
+function docPreviewOrUpload(key, docs){
+  const nameKey = key==='idDoc' ? 'idDocName' : 'contractName';
+  const data = docs[key]; const name = docs[nameKey]; const isImage = data && data.startsWith('data:image');
+  return `${data ? `<div class="doc-preview">${isImage ? `<img src="${data}">` : `<div class="doc-icon">&#128196;</div>`}<div style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(name||'Uploaded file')}</div><button class="btn btn-sm btn-ghost" onclick="removeEmpDoc('${key}')">Remove</button></div>` : `<div class="field-hint" style="margin-bottom:8px;">No file uploaded. Accepts image or PDF, up to ~4MB.</div>`}<input type="file" accept="image/*,application/pdf" id="input_${key}" style="display:none" onchange="handleEmpDocPick(event,'${key}')"><button class="btn btn-sm" style="margin-top:8px;" onclick="document.getElementById('input_${key}').click()">${data?'Replace file':'Upload file'}</button>`;
+}
+async function handleEmpPhotoPick(ev){ const file = ev.target.files[0]; if(!file) return; try{ UI.modal.data.photo = await compressImage(file, 300, 0.65); renderModal(); }catch(e){ alert('Could not read photo.'); } }
+async function handleEmpDocPick(ev, key){
+  const file = ev.target.files[0]; if(!file) return;
+  if(file.size > 4.5*1024*1024){ alert('File is too large. Please use a file under ~4MB.'); return; }
+  try{ let dataUrl = file.type.startsWith('image/') ? await compressImage(file, 1000, 0.72) : await readFileAsDataURL(file);
+    UI.modal.docs[key] = dataUrl; UI.modal.docs[key==='idDoc'?'idDocName':'contractName'] = file.name; renderModal();
+  }catch(e){ alert('Could not read that file.'); }
+}
+function removeEmpDoc(key){ UI.modal.docs[key] = null; UI.modal.docs[key==='idDoc'?'idDocName':'contractName'] = null; renderModal(); }
+async function saveEmployee(){
+  const d = UI.modal.data; const name = document.getElementById('f_name').value.trim();
+  if(!name){ alert('Name is required.'); return; }
+  d.name = name; d.code = document.getElementById('f_code').value.trim(); d.role = document.getElementById('f_role').value.trim();
+  d.phone = document.getElementById('f_phone').value.trim(); d.branchId = isAdmin() ? document.getElementById('f_branch').value : myBranchId();
+  d.shiftId = document.getElementById('f_shift').value; d.joinDate = document.getElementById('f_join').value; d.status = document.getElementById('f_status').value;
+  d.salary = document.getElementById('f_salary').value ? Number(document.getElementById('f_salary').value) : '';
+  d.targetHours = document.getElementById('f_hours').value ? Number(document.getElementById('f_hours').value) : 8;
+  if(!d.id){ d.id = uid('emp'); DB.employees.push(d); } else { DB.employees[DB.employees.findIndex(x=>x.id===d.id)] = d; }
+  await saveKey('employees'); await saveEmpDocs(d.id, UI.modal.docs); closeModal(); renderTab();
+}
+async function deleteEmployee(id){ if(!confirm('Remove this employee? Their attendance history will be kept.')) return; DB.employees = DB.employees.filter(e=>e.id!==id); await saveKey('employees'); renderTab(); }
+
+/* ============================= BRANCHES (admin only) ============================= */
+function renderBranches(){
+  const rows = DB.branches.map(b=>{ const count = DB.employees.filter(e=>e.branchId===b.id).length;
+    return `<tr><td><strong>${esc(b.name)}</strong></td><td>${esc(b.location||'—')}</td><td>${esc(b.manager||'—')}</td><td>${esc(b.phone||'—')}</td><td>${count}</td><td><button class="btn btn-sm" onclick="editBranch('${b.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteBranch('${b.id}')">Delete</button></td></tr>`; }).join('');
+  return `<div class="filter-bar"><button class="btn btn-primary" style="margin-left:auto" onclick="editBranch(null)">+ Add branch</button></div><div class="table-wrap"><table><thead><tr><th>Branch</th><th>Location</th><th>Manager</th><th>Phone</th><th>Staff</th><th></th></tr></thead><tbody>${rows || `<tr class="empty-row"><td colspan="6">No branches yet.</td></tr>`}</tbody></table></div>`;
+}
+function editBranch(id){ const b = id? DB.branches.find(x=>x.id===id) : {id:null,name:'',location:'',manager:'',phone:''}; UI.modal = {type:'branch', data:Object.assign({}, b)}; renderModal(); }
+function renderBranchModal(){
+  const d = UI.modal.data;
+  document.getElementById('modalRoot').innerHTML = `<div class="modal-backdrop" onclick="if(event.target===this) closeModal()"><div class="modal" style="position:relative;"><button class="close-x" onclick="closeModal()">&times;</button><h3>${d.id?'Edit branch':'Add branch'}</h3><div class="sub">Store / outlet details</div><div class="field"><label>Branch name</label><input id="b_name" value="${esc(d.name)}"></div><div class="field"><label>Location / address</label><input id="b_loc" value="${esc(d.location)}"></div><div class="field"><label>Branch manager</label><input id="b_mgr" value="${esc(d.manager)}"></div><div class="field"><label>Phone</label><input id="b_phone" value="${esc(d.phone)}"></div><div class="modal-actions"><button class="btn" style="flex:1" onclick="closeModal()">Cancel</button><button class="btn btn-primary" style="flex:1" onclick="saveBranch()">Save branch</button></div></div></div>`;
+}
+async function saveBranch(){
+  const d = UI.modal.data; const name = document.getElementById('b_name').value.trim(); if(!name){ alert('Branch name required.'); return; }
+  d.name=name; d.location=document.getElementById('b_loc').value.trim(); d.manager=document.getElementById('b_mgr').value.trim(); d.phone=document.getElementById('b_phone').value.trim();
+  if(!d.id){ d.id=uid('br'); DB.branches.push(d); } else { DB.branches[DB.branches.findIndex(x=>x.id===d.id)]=d; }
+  await saveKey('branches'); closeModal(); renderTab();
+}
+async function deleteBranch(id){
+  const inUse = DB.employees.some(e=>e.branchId===id) || DB.users.some(u=>u.branchId===id);
+  if(inUse && !confirm('Employees or a login are assigned to this branch. Delete anyway?')) return;
+  DB.branches = DB.branches.filter(b=>b.id!==id); await saveKey('branches'); renderTab();
+}
+
+/* ============================= SHIFTS ============================= */
+function renderShifts(){
+  const rows = DB.shifts.map(s=>{ const count = DB.employees.filter(e=>e.shiftId===s.id).length;
+    return `<tr><td><strong>${esc(s.name)}</strong></td><td class="mono">${s.start} – ${s.end}</td><td>${s.grace||0} min</td><td>${count}</td><td>${isAdmin() ? `<button class="btn btn-sm" onclick="editShift('${s.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteShift('${s.id}')">Delete</button>` : ''}</td></tr>`; }).join('');
+  return `<div class="filter-bar"><div class="tag-locked">Shifts define expected start time, used to flag late punches and payroll fines.</div>${isAdmin()?`<button class="btn btn-primary" style="margin-left:auto" onclick="editShift(null)">+ Add shift</button>`:''}</div><div class="table-wrap"><table><thead><tr><th>Shift</th><th>Timing</th><th>Grace period</th><th>Staff assigned</th><th></th></tr></thead><tbody>${rows || `<tr class="empty-row"><td colspan="5">No shifts yet.</td></tr>`}</tbody></table></div>`;
+}
+function editShift(id){ if(!isAdmin()) return; const s = id? DB.shifts.find(x=>x.id===id) : {id:null,name:'',start:'09:00',end:'18:00',grace:15}; UI.modal = {type:'shift', data:Object.assign({}, s)}; renderModal(); }
+function renderShiftModal(){
+  const d = UI.modal.data;
+  document.getElementById('modalRoot').innerHTML = `<div class="modal-backdrop" onclick="if(event.target===this) closeModal()"><div class="modal" style="position:relative;"><button class="close-x" onclick="closeModal()">&times;</button><h3>${d.id?'Edit shift':'Add shift'}</h3><div class="sub">Working hours & late-arrival grace period</div><div class="field"><label>Shift name</label><input id="s_name" value="${esc(d.name)}" placeholder="Morning Shift"></div><div class="form-grid"><div class="field"><label>Start time</label><input type="time" id="s_start" value="${d.start}"></div><div class="field"><label>End time</label><input type="time" id="s_end" value="${d.end}"></div></div><div class="field"><label>Grace period (minutes before marked late)</label><input type="number" min="0" id="s_grace" value="${d.grace}"></div><div class="modal-actions"><button class="btn" style="flex:1" onclick="closeModal()">Cancel</button><button class="btn btn-primary" style="flex:1" onclick="saveShift()">Save shift</button></div></div></div>`;
+}
+async function saveShift(){
+  const d = UI.modal.data; const name = document.getElementById('s_name').value.trim(); if(!name){ alert('Shift name required.'); return; }
+  d.name=name; d.start=document.getElementById('s_start').value; d.end=document.getElementById('s_end').value; d.grace= parseInt(document.getElementById('s_grace').value||'0',10);
+  if(!d.id){ d.id=uid('sh'); DB.shifts.push(d); } else { DB.shifts[DB.shifts.findIndex(x=>x.id===d.id)]=d; }
+  await saveKey('shifts'); closeModal(); renderTab();
+}
+async function deleteShift(id){ if(!isAdmin() || !confirm('Delete this shift?')) return; DB.shifts = DB.shifts.filter(s=>s.id!==id); await saveKey('shifts'); renderTab(); }
+
+/* ============================= LEAVES ============================= */
+function renderLeaves(){
+  const branches = visibleBranches();
+  const branchSelector = isAdmin()
+    ? `<div class="field"><label>Branch</label><select onchange="UI.leaveFilters.branch=this.value;renderTab()"><option value="all">All branches</option>${branches.map(b=>`<option value="${b.id}" ${UI.leaveFilters.branch===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}</select></div>`
+    : `<div class="locked-branch-tag">&#127970; ${esc(branchName(myBranchId()))}</div>`;
+  let list = DB.leaves.slice().sort((a,b)=> b.from.localeCompare(a.from));
+  const branchFilter = isAdmin() ? UI.leaveFilters.branch : myBranchId();
+  if(branchFilter!=='all') list = list.filter(l=>{ const e=empById(l.employeeId); return e && e.branchId===branchFilter; });
+  if(UI.leaveFilters.status!=='all') list = list.filter(l=>l.status===UI.leaveFilters.status);
+  const rows = list.map(l=>{ const e = empById(l.employeeId);
+    return `<tr><td>${e? esc(e.name) : 'Unknown'}</td><td>${e? esc(branchName(e.branchId)) : '—'}</td><td>${esc(l.type)}</td><td>${fmtDateShort(l.from)} ${l.from!==l.to? '– '+fmtDateShort(l.to):''}</td><td style="max-width:200px;">${esc(l.reason||'—')}</td><td><select onchange="updateLeaveStatus('${l.id}', this.value)" class="badge ${l.status==='Approved'?'badge-present':l.status==='Rejected'?'badge-late':'badge-pending'}" style="border:none;"><option ${l.status==='Pending'?'selected':''}>Pending</option><option ${l.status==='Approved'?'selected':''}>Approved</option><option ${l.status==='Rejected'?'selected':''}>Rejected</option></select></td><td><button class="btn btn-sm btn-danger" onclick="deleteLeave('${l.id}')">Delete</button></td></tr>`; }).join('');
+  return `<div class="filter-bar">${branchSelector}<div class="field"><label>Status</label><select onchange="UI.leaveFilters.status=this.value;renderTab()"><option value="all">All statuses</option><option>Pending</option><option>Approved</option><option>Rejected</option></select></div><button class="btn btn-primary" style="margin-left:auto" onclick="editLeave()">+ Add leave</button></div><div class="table-wrap"><table><thead><tr><th>Employee</th><th>Branch</th><th>Type</th><th>Dates</th><th>Reason</th><th>Status</th><th></th></tr></thead><tbody>${rows || `<tr class="empty-row"><td colspan="7">No leave records yet.</td></tr>`}</tbody></table></div>`;
+}
+function editLeave(){
+  const pool = isAdmin() ? DB.employees : DB.employees.filter(e=>e.branchId===myBranchId());
+  if(pool.length===0){ alert('Add an employee first.'); return; }
+  UI.modal = {type:'leave', data:{employeeId: pool[0].id, type:'Sick', from: todayStr(), to: todayStr(), reason:'', status:'Approved'}}; renderModal();
+}
+function renderLeaveModal(){
+  const d = UI.modal.data; const pool = isAdmin() ? DB.employees : DB.employees.filter(e=>e.branchId===myBranchId());
+  document.getElementById('modalRoot').innerHTML = `<div class="modal-backdrop" onclick="if(event.target===this) closeModal()"><div class="modal" style="position:relative;"><button class="close-x" onclick="closeModal()">&times;</button><h3>Add leave</h3><div class="sub">Record time off for a staff member</div><div class="field"><label>Employee</label><select id="l_emp">${pool.map(e=>`<option value="${e.id}" ${d.employeeId===e.id?'selected':''}>${esc(e.name)} — ${esc(branchName(e.branchId))}</option>`).join('')}</select></div><div class="form-grid"><div class="field"><label>Leave type</label><select id="l_type">${['Sick','Casual','Paid','Unpaid','Emergency'].map(t=>`<option ${d.type===t?'selected':''}>${t}</option>`).join('')}</select></div><div class="field"><label>Status</label><select id="l_status">${['Approved','Pending','Rejected'].map(t=>`<option ${d.status===t?'selected':''}>${t}</option>`).join('')}</select></div><div class="field"><label>From</label><input type="date" id="l_from" value="${d.from}"></div><div class="field"><label>To</label><input type="date" id="l_to" value="${d.to}"></div></div><div class="field"><label>Reason (optional)</label><textarea id="l_reason">${esc(d.reason)}</textarea></div><div class="modal-actions"><button class="btn" style="flex:1" onclick="closeModal()">Cancel</button><button class="btn btn-primary" style="flex:1" onclick="saveLeave()">Save leave</button></div></div></div>`;
+}
+async function saveLeave(){
+  const d = UI.modal.data; d.employeeId = document.getElementById('l_emp').value; if(!d.employeeId){ alert('Add an employee first.'); return; }
+  d.type = document.getElementById('l_type').value; d.status = document.getElementById('l_status').value; d.from = document.getElementById('l_from').value; d.to = document.getElementById('l_to').value;
+  if(d.to < d.from){ alert('End date must be after start date.'); return; }
+  d.reason = document.getElementById('l_reason').value.trim(); d.id = uid('lv'); DB.leaves.push(d);
+  await saveKey('leaves'); closeModal(); renderTab();
+}
+async function updateLeaveStatus(id, status){ const l = DB.leaves.find(x=>x.id===id); if(l){ l.status=status; await saveKey('leaves'); renderTab(); } }
+async function deleteLeave(id){ DB.leaves = DB.leaves.filter(l=>l.id!==id); await saveKey('leaves'); renderTab(); }
+
+/* ============================= PAYROLL ============================= */
+function renderPayroll(){
+  const branches = visibleBranches();
+  if(branches.length===0) return `<div class="empty-state"><div class="big">💰</div>Add a branch first to run payroll.</div>`;
+  if(!UI.payroll.branchId || !branches.find(b=>b.id===UI.payroll.branchId)) UI.payroll.branchId = branches[0].id;
+  const branchId = UI.payroll.branchId; const mStr = UI.payroll.month;
+  const run = findPayrollRun(branchId, mStr);
+
+  const branchSelector = isAdmin()
+    ? `<div class="field"><label>Branch</label><select onchange="UI.payroll.branchId=this.value;renderTab()">${branches.map(b=>`<option value="${b.id}" ${branchId===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}</select></div>`
+    : `<div class="locked-branch-tag">&#127970; ${esc(branchName(branchId))}</div>`;
+
+  let body;
+  if(!run){
+    body = `<div class="empty-state"><div class="big">💰</div>No payroll generated yet for ${esc(branchName(branchId))} — ${mStr}.<div style="margin-top:14px;"><button class="btn btn-primary" onclick="generatePayroll()">Generate payroll</button></div></div>`;
+  } else {
+    const locked = run.status==='Approved';
+    const canEditLines = !locked && (isAdmin() || (CURRENT_USER.role==='branch' && run.status==='Draft'));
+    const rows = run.lines.map((line,idx)=>{
+      const e = empById(line.employeeId);
+      const adjTotal = (line.adjustments||[]).reduce((s,a)=>s+Number(a.amount||0),0);
+      return `<tr>
+        <td>${e? esc(e.name):'Removed employee'}</td>
+        <td>${money(line.baseSalary)}</td>
+        <td>${line.presentDays}</td>
+        <td>${line.paidLeaveDays}</td>
+        <td>${line.lateDayCount}</td>
+        <td>${line.fineCount>0 ? `<span class="badge badge-late">${money(line.fineAmount)}</span>` : '—'}</td>
+        <td>
+          ${adjTotal!==0 ? `<span class="badge ${adjTotal>0?'badge-present':'badge-late'}">${adjTotal>0?'+':''}${money(adjTotal)}</span>` : '—'}
+          <div class="adj-list">${(line.adjustments||[]).map((a,ai)=>`<div><span>${esc(a.label)}</span><span>${a.amount>0?'+':''}${money(a.amount)} ${canEditLines?`<a href="#" onclick="removeAdjustment(${idx},${ai});return false;" style="color:var(--warn);text-decoration:none;">✕</a>`:''}</span></div>`).join('')}</div>
+          ${canEditLines ? `<button class="btn btn-sm" style="margin-top:6px;" onclick="openAdjustmentModal(${idx})">+ Adjustment</button>` : ''}
+        </td>
+        <td><strong>${money(line.net)}</strong></td>
+      </tr>`;
+    }).join('');
+    const totalNet = run.lines.reduce((s,l)=>s+l.net,0);
+
+    const statusBadge = run.status==='Approved' ? `<span class="badge badge-approved">Approved</span>` : run.status==='Prepared' ? `<span class="badge badge-pending">Awaiting approval</span>` : `<span class="badge badge-draft">Draft</span>`;
+
+    let actions = '';
+    if(run.status==='Draft'){
+      actions += `<button class="btn btn-primary btn-sm" onclick="recalcPayrollRun()">Recalculate hours</button> `;
+      actions += `<button class="btn btn-primary btn-sm" onclick="preparePayrollRun()">Mark as Prepared</button> `;
+    } else if(run.status==='Prepared'){
+      if(isAdmin()) actions += `<button class="btn btn-primary btn-sm" onclick="approvePayrollRun()">Approve payroll</button> <button class="btn btn-sm" onclick="reopenPayrollRun()">Reopen to Draft</button>`;
+      else actions += `<span class="field-hint">Waiting for admin approval.</span>`;
+    } else if(run.status==='Approved'){
+      if(isAdmin()) actions += `<button class="btn btn-sm" onclick="reopenPayrollRun()">Reopen for correction</button>`;
+      else actions += `<span class="field-hint">Approved — locked.</span>`;
+    }
+
+    body = `
+      <div class="card" style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <div>
+          ${statusBadge}
+          <div class="field-hint" style="margin-top:6px;">Prepared by ${esc(run.preparedBy||'—')} ${run.preparedAt?'· '+fmtDateTime(run.preparedAt):''}${run.approvedBy?` · Approved by ${esc(run.approvedBy)} · ${fmtDateTime(run.approvedAt)}`:''}</div>
+        </div>
+        <div>${actions}</div>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>Employee</th><th>Base salary</th><th>Present days</th><th>Paid leave</th><th>Late days</th><th>Late fine</th><th>Adjustments</th><th>Net pay</th></tr></thead>
+      <tbody>${rows || `<tr class="empty-row"><td colspan="8">No employees in this branch.</td></tr>`}</tbody></table></div>
+      <div class="stat-grid" style="margin-top:16px;"><div class="stat-card in"><div class="stat-num">${money(totalNet)}</div><div class="stat-label">Total net payroll for ${mStr}</div></div></div>
+    `;
+  }
+
+  const history = DB.payrollRuns.filter(r=> isAdmin() ? true : r.branchId===myBranchId()).sort((a,b)=> b.month.localeCompare(a.month)).slice(0,10);
+  return `
+    <div class="filter-bar">${branchSelector}<div class="field"><label>Month</label><input type="month" value="${mStr}" onchange="UI.payroll.month=this.value;renderTab()"></div></div>
+    ${body}
+    <div class="section-head"><h2>Payroll history</h2></div>
+    <div class="table-wrap"><table><thead><tr><th>Month</th><th>Branch</th><th>Status</th><th>Net total</th><th></th></tr></thead>
+    <tbody>${history.map(r=>{ const total=r.lines.reduce((s,l)=>s+l.net,0); return `<tr><td>${r.month}</td><td>${esc(branchName(r.branchId))}</td><td><span class="badge ${r.status==='Approved'?'badge-approved':r.status==='Prepared'?'badge-pending':'badge-draft'}">${r.status}</span></td><td>${money(total)}</td><td><button class="btn btn-sm" onclick="UI.payroll.branchId='${r.branchId}';UI.payroll.month='${r.month}';renderTab()">Open</button></td></tr>`; }).join('') || `<tr class="empty-row"><td colspan="5">No payroll runs yet.</td></tr>`}</tbody></table></div>
+  `;
+}
+async function generatePayroll(){
+  const branchId = UI.payroll.branchId; const mStr = UI.payroll.month;
+  const lines = computePayrollLines(branchId, mStr);
+  const run = {id: uid('pr'), branchId, month: mStr, status:'Draft', preparedBy:null, preparedAt:null, approvedBy:null, approvedAt:null, lines};
+  DB.payrollRuns.push(run);
+  await saveKey('payrollRuns'); renderTab();
+}
+async function recalcPayrollRun(){
+  const run = findPayrollRun(UI.payroll.branchId, UI.payroll.month); if(!run) return;
+  const fresh = computePayrollLines(run.branchId, run.month);
+  fresh.forEach(fl=>{ const old = run.lines.find(l=>l.employeeId===fl.employeeId); if(old) fl.adjustments = old.adjustments; recalcLine(fl); });
+  run.lines = fresh;
+  await saveKey('payrollRuns'); renderTab();
+}
+async function preparePayrollRun(){
+  const run = findPayrollRun(UI.payroll.branchId, UI.payroll.month); if(!run) return;
+  run.status='Prepared'; run.preparedBy=CURRENT_USER.name; run.preparedAt=new Date().toISOString();
+  await saveKey('payrollRuns'); renderTab();
+}
+async function approvePayrollRun(){
+  if(!isAdmin()) return; const run = findPayrollRun(UI.payroll.branchId, UI.payroll.month); if(!run) return;
+  run.status='Approved'; run.approvedBy=CURRENT_USER.name; run.approvedAt=new Date().toISOString();
+  await saveKey('payrollRuns'); renderTab();
+}
+async function reopenPayrollRun(){
+  if(!isAdmin()) return; const run = findPayrollRun(UI.payroll.branchId, UI.payroll.month); if(!run) return;
+  run.status='Draft'; run.approvedBy=null; run.approvedAt=null;
+  await saveKey('payrollRuns'); renderTab();
+}
+function openAdjustmentModal(lineIdx){ UI.modal = {type:'adjustment', lineIdx, label:'', amount:''}; renderModal(); }
+function renderAdjustmentModal(){
+  document.getElementById('modalRoot').innerHTML = `<div class="modal-backdrop" onclick="if(event.target===this) closeModal()"><div class="modal" style="position:relative;"><button class="close-x" onclick="closeModal()">&times;</button><h3>Add salary adjustment</h3><div class="sub">Positive for bonus, negative for deduction</div><div class="field"><label>Label</label><input id="adj_label" placeholder="e.g. Performance bonus"></div><div class="field"><label>Amount</label><input id="adj_amount" type="number" placeholder="e.g. 1500 or -500"></div><div class="modal-actions"><button class="btn" style="flex:1" onclick="closeModal()">Cancel</button><button class="btn btn-primary" style="flex:1" onclick="saveAdjustment()">Add</button></div></div></div>`;
+}
+async function saveAdjustment(){
+  const label = document.getElementById('adj_label').value.trim(); const amount = Number(document.getElementById('adj_amount').value);
+  if(!label || !amount){ alert('Enter a label and a non-zero amount.'); return; }
+  const run = findPayrollRun(UI.payroll.branchId, UI.payroll.month); if(!run) return;
+  const line = run.lines[UI.modal.lineIdx]; line.adjustments = line.adjustments||[]; line.adjustments.push({label, amount}); recalcLine(line);
+  await saveKey('payrollRuns'); closeModal(); renderTab();
+}
+async function removeAdjustment(lineIdx, adjIdx){
+  const run = findPayrollRun(UI.payroll.branchId, UI.payroll.month); if(!run) return;
+  const line = run.lines[lineIdx]; line.adjustments.splice(adjIdx,1); recalcLine(line);
+  await saveKey('payrollRuns'); renderTab();
+}
+
+/* ============================= REPORTS ============================= */
+function renderReports(){
+  const f = UI.reportFilters; const branches = visibleBranches();
+  const branchSelector = isAdmin()
+    ? `<div class="field"><label>Branch</label><select onchange="UI.reportFilters.branch=this.value;UI.reportFilters.employee='all';renderTab()"><option value="all">All branches</option>${branches.map(b=>`<option value="${b.id}" ${f.branch===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}</select></div>`
+    : `<div class="locked-branch-tag">&#127970; ${esc(branchName(myBranchId()))}</div>`;
+  const effectiveBranch = isAdmin() ? f.branch : myBranchId();
+  const empPool = effectiveBranch==='all'? DB.employees : DB.employees.filter(e=>e.branchId===effectiveBranch);
+  const empOpts = `<option value="all">All employees</option>` + empPool.map(e=>`<option value="${e.id}" ${f.employee===e.id?'selected':''}>${esc(e.name)}</option>`).join('');
+  let rows = DB.attendance.filter(r=> r.date>=f.from && r.date<=f.to);
+  if(effectiveBranch!=='all') rows = rows.filter(r=>r.branchId===effectiveBranch);
+  if(f.employee!=='all') rows = rows.filter(r=>r.employeeId===f.employee);
+  rows = rows.slice().sort((a,b)=> a.date.localeCompare(b.date) || new Date(a.punchIn)-new Date(b.punchIn));
+  let totalMs = 0;
+  const tableRows = rows.map(r=>{
+    const e = empById(r.employeeId); const shift = shiftById(r.shiftId); const hw = hoursWorked(r); if(hw) totalMs += (new Date(r.punchOut)-new Date(r.punchIn));
+    const status = computeStatus(r); const target = e && e.targetHours ? e.targetHours : null;
+    let diffLabel = '—'; if(hw && target){ const diff = hw.decimal - target; diffLabel = (diff>=0?'+':'') + diff.toFixed(1)+'h'; }
+    return `<tr><td>${fmtDateShort(r.date)}</td><td>${e? esc(e.name):'Unknown'}</td><td>${esc(branchName(r.branchId))}</td><td>${shift? esc(shift.name):'—'}</td><td class="mono">${fmtTime(r.punchIn)}</td><td class="mono">${fmtTime(r.punchOut)}</td><td>${fmtHM(hw)}</td><td>${diffLabel}</td><td><span class="badge ${statusBadgeClass(status)}">${status}</span></td><td style="max-width:160px;">${esc(r.note||'')}</td></tr>`;
+  }).join('');
+  const totalH = Math.floor(totalMs/3600000); const totalM = Math.round((totalMs%3600000)/60000);
+  let leaves = DB.leaves.filter(l=> l.status==='Approved' && l.from<=f.to && l.to>=f.from);
+  if(effectiveBranch!=='all') leaves = leaves.filter(l=>{ const e=empById(l.employeeId); return e && e.branchId===effectiveBranch; });
+  if(f.employee!=='all') leaves = leaves.filter(l=>l.employeeId===f.employee);
+  return `<div class="filter-bar">${branchSelector}<div class="field"><label>Employee</label><select onchange="UI.reportFilters.employee=this.value;renderTab()">${empOpts}</select></div><div class="field"><label>From</label><input type="date" value="${f.from}" onchange="UI.reportFilters.from=this.value;renderTab()"></div><div class="field"><label>To</label><input type="date" value="${f.to}" onchange="UI.reportFilters.to=this.value;renderTab()"></div><button class="btn btn-primary" style="margin-left:auto" onclick="exportCSV()">&#8681; Export CSV</button></div>
+    <div class="stat-grid"><div class="stat-card"><div class="stat-num">${rows.length}</div><div class="stat-label">Punch records</div></div><div class="stat-card in"><div class="stat-num">${totalH}h ${totalM}m</div><div class="stat-label">Total hours worked</div></div><div class="stat-card leave"><div class="stat-num">${leaves.length}</div><div class="stat-label">Leave entries in range</div></div></div>
+    <div class="section-head"><h2>Daily attendance</h2></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Employee</th><th>Branch</th><th>Shift</th><th>In</th><th>Out</th><th>Hours</th><th>Vs target</th><th>Status</th><th>Note</th></tr></thead><tbody>${tableRows || `<tr class="empty-row"><td colspan="10">No attendance in this range.</td></tr>`}</tbody></table></div>
+    <div class="section-head"><h2>Leaves in range</h2></div><div class="table-wrap"><table><thead><tr><th>Employee</th><th>Type</th><th>From</th><th>To</th><th>Reason</th></tr></thead><tbody>${leaves.map(l=>{ const e=empById(l.employeeId); return `<tr><td>${e?esc(e.name):'Unknown'}</td><td>${esc(l.type)}</td><td>${fmtDateShort(l.from)}</td><td>${fmtDateShort(l.to)}</td><td>${esc(l.reason||'—')}</td></tr>`; }).join('') || `<tr class="empty-row"><td colspan="5">No leaves in this range.</td></tr>`}</tbody></table></div>`;
+}
+function exportCSV(){
+  const f = UI.reportFilters; const effectiveBranch = isAdmin() ? f.branch : myBranchId();
+  let rows = DB.attendance.filter(r=> r.date>=f.from && r.date<=f.to);
+  if(effectiveBranch!=='all') rows = rows.filter(r=>r.branchId===effectiveBranch);
+  if(f.employee!=='all') rows = rows.filter(r=>r.employeeId===f.employee);
+  rows = rows.slice().sort((a,b)=> a.date.localeCompare(b.date));
+  const header = ['Date','Employee','Employee Code','Branch','Shift','Punch In','Punch Out','Hours Worked','Target Hours/Day','Status','Note'];
+  const lines = [header.join(',')];
+  rows.forEach(r=>{ const e = empById(r.employeeId); const shift = shiftById(r.shiftId); const hw = hoursWorked(r); const status = computeStatus(r);
+    const line = [r.date, e?e.name:'Unknown', e?e.code||'':'', branchName(r.branchId), shift?shift.name:'', r.punchIn? new Date(r.punchIn).toLocaleString():'', r.punchOut? new Date(r.punchOut).toLocaleString():'', hw? (hw.h+'h '+hw.m+'m'):'', e&&e.targetHours?e.targetHours:'', status, (r.note||'').replace(/,/g,';')].map(v=> `"${String(v).replace(/"/g,'""')}"`).join(',');
+    lines.push(line); });
+  const blob = new Blob([lines.join('\\n')], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `attendance_${f.from}_to_${f.to}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+/* ============================= USERS (admin only) ============================= */
+function renderUsers(){
+  const rows = DB.users.map(u=>`<tr><td>${esc(u.name)}</td><td class="mono">${esc(u.username)}</td><td><span class="badge ${u.role==='admin'?'badge-admin':'badge-branch'}">${u.role==='admin'?'Admin':'Branch manager'}</span></td><td>${u.role==='branch'? esc(branchName(u.branchId)) : 'All branches'}</td><td><button class="btn btn-sm" onclick="editUser('${u.id}')">Edit</button> ${u.id!==CURRENT_USER.id ? `<button class="btn btn-sm btn-danger" onclick="deleteUser('${u.id}')">Delete</button>` : ''}</td></tr>`).join('');
+  return `<div class="filter-bar"><div class="tag-locked">Branch managers can only see and manage their own branch's data. Admins see everything.</div><button class="btn btn-primary" style="margin-left:auto" onclick="editUser(null)">+ Add user</button></div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Branch</th><th></th></tr></thead><tbody>${rows || `<tr class="empty-row"><td colspan="5">No users yet.</td></tr>`}</tbody></table></div>`;
+}
+function editUser(id){ const u = id? DB.users.find(x=>x.id===id) : {id:null, name:'', username:'', password:'', role:'branch', branchId: DB.branches[0]?.id||''}; UI.modal = {type:'user', data:Object.assign({}, u)}; renderModal(); }
+function renderUserModal(){
+  const d = UI.modal.data;
+  document.getElementById('modalRoot').innerHTML = `<div class="modal-backdrop" onclick="if(event.target===this) closeModal()"><div class="modal" style="position:relative;"><button class="close-x" onclick="closeModal()">&times;</button><h3>${d.id?'Edit user':'Add user'}</h3><div class="sub">Login access — branch managers only see their assigned branch</div><div class="field"><label>Full name</label><input id="u_name" value="${esc(d.name)}"></div><div class="field"><label>Username</label><input id="u_user" value="${esc(d.username)}"></div><div class="field"><label>Password ${d.id?'(leave blank to keep current)':''}</label><input id="u_pass" type="text" placeholder="${d.id?'••••••••':'Set a password'}"></div><div class="field"><label>Role</label><select id="u_role" onchange="document.getElementById('u_branch_wrap').style.display=this.value==='branch'?'flex':'none'"><option value="branch" ${d.role==='branch'?'selected':''}>Branch manager</option><option value="admin" ${d.role==='admin'?'selected':''}>Admin (all branches)</option></select></div><div class="field" id="u_branch_wrap" style="${d.role==='branch'?'':'display:none'}"><label>Branch</label><select id="u_branch">${DB.branches.map(b=>`<option value="${b.id}" ${d.branchId===b.id?'selected':''}>${esc(b.name)}</option>`).join('') || '<option value="">Add a branch first</option>'}</select></div><div class="modal-actions"><button class="btn" style="flex:1" onclick="closeModal()">Cancel</button><button class="btn btn-primary" style="flex:1" onclick="saveUser()">Save user</button></div></div></div>`;
+}
+async function saveUser(){
+  const d = UI.modal.data; const name = document.getElementById('u_name').value.trim(); const username = document.getElementById('u_user').value.trim();
+  const pass = document.getElementById('u_pass').value; const role = document.getElementById('u_role').value;
+  const branchId = role==='branch' ? document.getElementById('u_branch').value : null;
+  if(!name || !username){ alert('Name and username are required.'); return; }
+  if(!d.id && !pass){ alert('Set a password for the new user.'); return; }
+  if(role==='branch' && !branchId){ alert('Select a branch for this user.'); return; }
+  const clash = DB.users.find(u=>u.username.toLowerCase()===username.toLowerCase() && u.id!==d.id);
+  if(clash){ alert('That username is already taken.'); return; }
+  d.name = name; d.username = username; d.role = role; d.branchId = branchId; if(pass) d.password = pass;
+  if(!d.id){ d.id = uid('usr'); DB.users.push(d); } else{ DB.users[DB.users.findIndex(x=>x.id===d.id)] = d; }
+  await saveKey('users'); closeModal(); renderTab();
+}
+async function deleteUser(id){ if(id===CURRENT_USER.id) return; if(!confirm('Remove this login?')) return; DB.users = DB.users.filter(u=>u.id!==id); await saveKey('users'); renderTab(); }
+
+/* ============================= SETTINGS (admin only) ============================= */
+function renderSettings(){
+  const s = DB.settings;
+  const swatches = Object.keys(THEME_PRESETS).map(k=>{ const t = THEME_PRESETS[k]; return `<div class="swatch ${s.theme===k?'active':''}" style="background:${t.accent}" title="${t.label}" onclick="pickTheme('${k}')">${s.theme===k?'&#10003;':''}</div>`; }).join('');
+  const cloudSql = `create table if not exists kv_store (\n  key text primary key,\n  value jsonb not null,\n  updated_at timestamptz default now()\n);\n\nalter table kv_store enable row level security;\n\ncreate policy "Allow anon read" on kv_store for select using (true);\ncreate policy "Allow anon write" on kv_store for insert with check (true);\ncreate policy "Allow anon update" on kv_store for update using (true);`;
+  return `
+    <div class="section-head"><h2>Company branding</h2></div>
+    <div class="card" style="margin-bottom:20px;">
+      <div class="logo-row">${s.companyLogo ? `<img class="logo-preview" src="${s.companyLogo}">` : `<div class="logo-placeholder">&#127970;</div>`}<div><input type="file" accept="image/*" id="logoInput" style="display:none" onchange="handleLogoPick(event)"><button class="btn btn-sm" onclick="document.getElementById('logoInput').click()">Upload logo</button>${s.companyLogo?` <button class="btn btn-sm btn-ghost" onclick="clearLogo()">Remove</button>`:''}</div></div>
+      <div class="field"><label>Company name</label><input id="set_company" value="${esc(s.companyName)}"></div>
+      <div class="field"><label>Accent color theme</label></div>
+      <div class="swatch-row">${swatches}</div>
+      <button class="btn btn-primary" onclick="saveBranding()">Save branding</button>
+    </div>
+
+    <div class="section-head"><h2>Payroll rules</h2></div>
+    <div class="card" style="margin-bottom:20px;">
+      <div class="form-grid">
+        <div class="field"><label>Standard working days / month</label><input type="number" min="1" id="set_days" value="${s.standardWorkingDays}"></div>
+        <div class="field"><label>Late arrivals allowed before a fine (per month)</label><input type="number" min="0" id="set_threshold" value="${s.lateThreshold}"></div>
+        <div class="field"><label>Fine per late day beyond the allowance</label><input type="number" min="0" id="set_fine" value="${s.lateFineAmount}"></div>
+      </div>
+      <div class="field-hint" style="margin-bottom:12px;">"Late" is any punch-in after the shift's start time plus its grace period. Fines apply from the 4th late day onward if the allowance above is 3.</div>
+      <button class="btn btn-primary" onclick="savePayrollRules()">Save payroll rules</button>
+    </div>
+
+    <div class="section-head"><h2>Cloud sync</h2></div>
+    <div class="card">
+      <div style="margin-bottom:10px;">${CLOUD_ENABLED ? `<span class="badge badge-approved">Connected to Supabase</span>` : `<span class="badge badge-draft">Not connected — using ${STORAGE_AVAILABLE?"Claude's built-in storage":'in-memory only'}</span>`}</div>
+      <div class="field-hint" style="margin-bottom:12px;">To sync attendance and payroll across every browser and device (not just inside Claude.ai), connect a free Supabase project. This is a one-time code edit, not a form here — paste your credentials into the <span class="mono">CLOUD_CONFIG</span> block near the top of this file's &lt;script&gt;, then re-open the file.</div>
+      <div class="field-hint" style="margin-bottom:8px;"><strong>1.</strong> Create a free project at supabase.com. <strong>2.</strong> In the SQL editor, run:</div>
+      <div class="code-box">${esc(cloudSql)}</div>
+      <div class="field-hint" style="margin:10px 0;"><strong>3.</strong> Copy your Project URL and "anon public" API key from Settings → API, and paste them into <span class="mono">CLOUD_CONFIG</span> in the code. <strong>4.</strong> Re-download / re-share the file — everyone using that copy will now read and write the same live database.</div>
+      <div class="field-hint">Note: the anon key is meant to be public, but the policy above allows any holder of this file to read and write all data — the same shared-access model as before, just now durable across devices instead of tied to one Claude conversation.</div>
+    </div>
+  `;
+}
+async function handleLogoPick(ev){ const file = ev.target.files[0]; if(!file) return; try{ DB.settings.companyLogo = await compressImage(file, 200, 0.8); renderTab(); }catch(e){ alert('Could not read logo.'); } }
+function clearLogo(){ DB.settings.companyLogo = null; renderTab(); }
+function pickTheme(key){ DB.settings.theme = key; renderTab(); }
+async function saveBranding(){
+  DB.settings.companyName = document.getElementById('set_company').value.trim() || 'ShiftCard Retail';
+  await saveKey('settings'); applyTheme(); render();
+}
+async function savePayrollRules(){
+  DB.settings.standardWorkingDays = Number(document.getElementById('set_days').value)||26;
+  DB.settings.lateThreshold = Number(document.getElementById('set_threshold').value)||0;
+  DB.settings.lateFineAmount = Number(document.getElementById('set_fine').value)||0;
+  await saveKey('settings'); renderTab();
+}
+
+/* ============================= INIT ============================= */
+loadDB();
+</script>
+</body>
+</html>
