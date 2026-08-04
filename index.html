@@ -194,14 +194,24 @@ tr:last-child td{border-bottom:none;}
    See the setup instructions the assistant provided alongside this file.
    ========================================================================= */
 const CLOUD_CONFIG = {
-  supabaseUrl: 'https://xzrtzxjdscakredwvllt.supabase.co',
-  supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6cnR6eGpkc2Nha3JlZHd2bGx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2OTAwMjksImV4cCI6MjEwMTI2NjAyOX0.H9cUM6F5TwETwEpJsLb31j4B6YTs15obTfoq_ZWjzpk'  };
+  supabaseUrl: '',      // e.g. 'https://xxxxxxxx.supabase.co'
+  supabaseAnonKey: ''   // your project's public "anon" key
+};
 const CLOUD_ENABLED = !!(CLOUD_CONFIG.supabaseUrl && CLOUD_CONFIG.supabaseAnonKey);
 let CLOUD_ERROR = false;
 
 /* ============================= DATA LAYER ============================= */
-const KEYS = ['branches','shifts','employees','attendance','leaves','users','settings','payrollRuns'];
-let DB = {branches:[], shifts:[], employees:[], attendance:[], leaves:[], users:[], settings:null, payrollRuns:[]};
+const KEYS = ['branches','shifts','employees','attendance','leaves','users','settings','payrollRuns','complaints'];
+let DB = {branches:[], shifts:[], employees:[], attendance:[], leaves:[], users:[], settings:null, payrollRuns:[], complaints:[]};
+const COMPLAINT_TYPES = ['Rude behavior','Poor service','Product/quality issue','Billing dispute','Long wait time','Cleanliness','Other'];
+const PERMISSION_KEYS = ['payroll','employeeDocs','complaints'];
+const PERMISSION_LABELS = {payroll:'Payroll (salary, fines, adjustments, approvals)', employeeDocs:'Employee sensitive info (salary, CNIC/passport, contract)', complaints:'Customer complaints'};
+function hasPerm(user, key){
+  if(!user) return false;
+  if(user.role==='admin') return true;
+  if(!user.permissions || user.permissions[key]===undefined) return true; /* default: allowed unless explicitly restricted */
+  return user.permissions[key] !== false;
+}
 
 const DEFAULT_SETTINGS = {companyName:'ShiftCard Retail', companyLogo:null, theme:'steel', standardWorkingDays:26, lateThreshold:3, lateFineAmount:200};
 const THEME_PRESETS = {
@@ -220,6 +230,7 @@ let UI = {
   tab:'dashboard', punchBranch:'all', punchSearch:'',
   reportFilters:{branch:'all', employee:'all', from: todayStr(), to: todayStr()},
   leaveFilters:{branch:'all', status:'all'}, empFilterBranch:'all',
+  complaintFilters:{branch:'all', status:'all', type:'all'},
   payroll:{branchId:null, month: monthStr()},
   modal:null
 };
@@ -315,8 +326,11 @@ function seedDemo(){
   DB.payrollRuns = [];
   DB.users = [
     {id:uid('usr'), username:'admin', password:'admin123', role:'admin', branchId:null, name:'Head Office Admin'},
-    {id:uid('usr'), username:'downtown.mgr', password:'branch123', role:'branch', branchId:b1.id, name:'Downtown Branch Manager'},
-    {id:uid('usr'), username:'airport.mgr', password:'branch123', role:'branch', branchId:b2.id, name:'Airport Branch Manager'}
+    {id:uid('usr'), username:'downtown.mgr', password:'branch123', role:'branch', branchId:b1.id, name:'Downtown Branch Manager', permissions:{payroll:true, employeeDocs:true, complaints:true}},
+    {id:uid('usr'), username:'airport.mgr', password:'branch123', role:'branch', branchId:b2.id, name:'Airport Branch Manager', permissions:{payroll:true, employeeDocs:true, complaints:true}}
+  ];
+  DB.complaints = [
+    {id:uid('cmp'), employeeId: DB.employees[0].id, branchId:b1.id, type:'Long wait time', description:'Customer said checkout took over 15 minutes during a busy evening.', customerName:'', date: todayStr(), status:'Open', loggedBy:'Downtown Branch Manager', createdAt: new Date().toISOString()}
   ];
   if(!DB.settings) DB.settings = Object.assign({}, DEFAULT_SETTINGS);
 }
@@ -445,7 +459,8 @@ function baseNav(){
   if(isAdmin()) nav.push({id:'branches', label:'Branches', icon:'&#127970;'});
   nav.push({id:'shifts', label:'Shifts', icon:'&#128197;'});
   nav.push({id:'leaves', label:'Leaves', icon:'&#9992;'});
-  nav.push({id:'payroll', label:'Payroll', icon:'&#128176;'});
+  if(hasPerm(CURRENT_USER,'complaints')) nav.push({id:'complaints', label:'Complaints', icon:'&#9888;'});
+  if(hasPerm(CURRENT_USER,'payroll')) nav.push({id:'payroll', label:'Payroll', icon:'&#128176;'});
   nav.push({id:'reports', label:'Reports', icon:'&#128202;'});
   if(isAdmin()) nav.push({id:'users', label:'Users', icon:'&#128274;'});
   if(isAdmin()) nav.push({id:'settings', label:'Settings', icon:'&#9881;'});
@@ -548,7 +563,8 @@ function renderTab(){
   else if(UI.tab==='branches' && isAdmin()) c.innerHTML = renderBranches();
   else if(UI.tab==='shifts') c.innerHTML = renderShifts();
   else if(UI.tab==='leaves') c.innerHTML = renderLeaves();
-  else if(UI.tab==='payroll') c.innerHTML = renderPayroll();
+  else if(UI.tab==='complaints' && hasPerm(CURRENT_USER,'complaints')) c.innerHTML = renderComplaints();
+  else if(UI.tab==='payroll' && hasPerm(CURRENT_USER,'payroll')) c.innerHTML = renderPayroll();
   else if(UI.tab==='reports') c.innerHTML = renderReports();
   else if(UI.tab==='users' && isAdmin()) c.innerHTML = renderUsers();
   else if(UI.tab==='settings' && isAdmin()) c.innerHTML = renderSettings();
@@ -565,6 +581,9 @@ function renderDashboard(){
   const stillWorking = todaysAtt.filter(r=>!r.punchOut).length;
   const onLeaveToday = empPool.filter(e=> leaveOnDate(e.id, today)).length;
   const absent = Math.max(0, totalEmp - uniqueInToday - onLeaveToday);
+  const canSeeComplaints = hasPerm(CURRENT_USER,'complaints');
+  const visibleComplaints = canSeeComplaints ? DB.complaints.filter(c=>empIds.has(c.employeeId)) : [];
+  const openComplaints = visibleComplaints.filter(c=>c.status==='Open').length;
 
   const branchRows = visibleBranches().map(b=>{
     const emps = employeesOfBranch(b.id).filter(e=>e.status!=='Inactive');
@@ -581,6 +600,7 @@ function renderDashboard(){
       <div class="stat-card"><div class="stat-num">${stillWorking}</div><div class="stat-label">Currently on shift</div></div>
       <div class="stat-card leave"><div class="stat-num">${onLeaveToday}</div><div class="stat-label">On leave today</div></div>
       <div class="stat-card out"><div class="stat-num">${absent}</div><div class="stat-label">Not marked / absent</div></div>
+      ${canSeeComplaints ? `<div class="stat-card out"><div class="stat-num">${openComplaints}</div><div class="stat-label">Open complaints</div></div>` : ''}
     </div>
     <div class="section-head"><h2>${isAdmin()?'Branch snapshot':'Your branch'} — ${fmtDateNice(today)}</h2></div>
     <div class="table-wrap"><table><thead><tr><th>Branch</th><th>Staff</th><th>Present</th><th>On leave</th><th>Unmarked</th></tr></thead>
@@ -591,6 +611,13 @@ function renderDashboard(){
         const e = empById(r.employeeId); const status=computeStatus(r);
         return `<tr><td>${esc(e?e.name:'Unknown')}</td><td>${esc(branchName(r.branchId))}</td><td class="mono">${fmtTime(r.punchIn)}</td><td class="mono">${fmtTime(r.punchOut)}</td><td><span class="badge ${statusBadgeClass(status)}">${status}</span></td></tr>`;
       }).join('') || `<tr class="empty-row"><td colspan="5">No punches recorded yet. Head to the Punch tab.</td></tr>`}</tbody></table></div>
+    ${canSeeComplaints ? `
+    <div class="section-head"><h2>Recent complaints</h2></div>
+    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Employee</th><th>Branch</th><th>Type</th><th>Status</th></tr></thead>
+      <tbody>${visibleComplaints.slice().sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,6).map(c=>{
+        const e = empById(c.employeeId);
+        return `<tr><td>${fmtDateShort(c.date)}</td><td>${e?esc(e.name):'Unknown'}</td><td>${esc(branchName(c.branchId))}</td><td>${esc(c.type)}</td><td><span class="badge ${c.status==='Resolved'?'badge-present':'badge-late'}">${c.status}</span></td></tr>`;
+      }).join('') || `<tr class="empty-row"><td colspan="5">No complaints logged yet.</td></tr>`}</tbody></table></div>` : ''}
   `;
 }
 
@@ -627,6 +654,7 @@ function renderModal(){
   else if(UI.modal.type==='leave'){ renderLeaveModal(); }
   else if(UI.modal.type==='user'){ renderUserModal(); }
   else if(UI.modal.type==='adjustment'){ renderAdjustmentModal(); }
+  else if(UI.modal.type==='complaint'){ renderComplaintModal(); }
 }
 function closeModal(){ UI.modal=null; renderModal(); }
 async function handlePhotoPick(ev){ const file = ev.target.files[0]; if(!file) return; try{ UI.modal.photo = await compressImage(file, 360, 0.6); renderModal(); }catch(err){ alert('Could not read photo, try again.'); } }
@@ -648,11 +676,12 @@ function renderEmployees(){
     ? `<div class="field"><label>Branch</label><select onchange="UI.empFilterBranch=this.value;renderTab()"><option value="all">All branches</option>${branches.map(b=>`<option value="${b.id}" ${UI.empFilterBranch===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}</select></div>`
     : `<div class="locked-branch-tag">&#127970; ${esc(branchName(myBranchId()))}</div>`;
   const list = isAdmin() ? employeesOfBranch(UI.empFilterBranch) : employeesOfBranch(myBranchId());
+  const canSeeSensitive = hasPerm(CURRENT_USER,'employeeDocs');
   const rows = list.map(e=>{
     const shift = shiftById(e.shiftId);
-    return `<tr><td style="display:flex;align-items:center;gap:10px;">${e.photo? `<img class="avatar" src="${e.photo}">` : `<div class="avatar">${initials(e.name)}</div>`}<div><div style="font-weight:600;">${esc(e.name)}</div><div class="emp-meta">${esc(e.code||'')}</div></div></td><td>${esc(e.role||'—')}</td><td>${esc(branchName(e.branchId))}</td><td>${shift? esc(shift.name) : '—'}</td><td>${e.salary? money(e.salary) : '—'}</td><td>${e.targetHours? e.targetHours+'h/day' : '—'}</td><td><span class="badge ${e.status==='Inactive'?'badge-off':'badge-present'}">${e.status||'Active'}</span></td><td><button class="btn btn-sm" onclick="editEmployee('${e.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteEmployee('${e.id}')">Delete</button></td></tr>`;
+    return `<tr><td style="display:flex;align-items:center;gap:10px;">${e.photo? `<img class="avatar" src="${e.photo}">` : `<div class="avatar">${initials(e.name)}</div>`}<div><div style="font-weight:600;">${esc(e.name)}</div><div class="emp-meta">${esc(e.code||'')}</div></div></td><td>${esc(e.role||'—')}</td><td>${esc(branchName(e.branchId))}</td><td>${shift? esc(shift.name) : '—'}</td>${canSeeSensitive?`<td>${e.salary? money(e.salary) : '—'}</td><td>${e.targetHours? e.targetHours+'h/day' : '—'}</td>`:''}<td><span class="badge ${e.status==='Inactive'?'badge-off':'badge-present'}">${e.status||'Active'}</span></td><td><button class="btn btn-sm" onclick="editEmployee('${e.id}')">Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteEmployee('${e.id}')">Delete</button></td></tr>`;
   }).join('');
-  return `<div class="filter-bar">${branchSelector}<button class="btn btn-primary" style="margin-left:auto" onclick="editEmployee(null)">+ Add employee</button></div><div class="table-wrap"><table><thead><tr><th>Employee</th><th>Role</th><th>Branch</th><th>Shift</th><th>Salary</th><th>Target hrs</th><th>Status</th><th></th></tr></thead><tbody>${rows || `<tr class="empty-row"><td colspan="8">No employees yet. Add your first staff member.</td></tr>`}</tbody></table></div>`;
+  return `<div class="filter-bar">${branchSelector}<button class="btn btn-primary" style="margin-left:auto" onclick="editEmployee(null)">+ Add employee</button></div><div class="table-wrap"><table><thead><tr><th>Employee</th><th>Role</th><th>Branch</th><th>Shift</th>${canSeeSensitive?'<th>Salary</th><th>Target hrs</th>':''}<th>Status</th><th></th></tr></thead><tbody>${rows || `<tr class="empty-row"><td colspan="${canSeeSensitive?8:6}">No employees yet. Add your first staff member.</td></tr>`}</tbody></table></div>`;
 }
 function editEmployee(id){
   const defaultBranch = isAdmin() ? (DB.branches[0]?.id||'') : myBranchId();
@@ -675,11 +704,15 @@ function renderEmployeeModal(){
       <div class="field"><label>Default shift</label><select id="f_shift"><option value="">— none —</option>${DB.shifts.map(s=>`<option value="${s.id}" ${d.shiftId===s.id?'selected':''}>${esc(s.name)} (${s.start}-${s.end})</option>`).join('')}</select></div>
       <div class="field"><label>Join date</label><input type="date" id="f_join" value="${d.joinDate||''}"></div>
       <div class="field"><label>Status</label><select id="f_status"><option ${d.status==='Active'?'selected':''}>Active</option><option ${d.status==='Inactive'?'selected':''}>Inactive</option></select></div>
+    </div>
+    ${hasPerm(CURRENT_USER,'employeeDocs') ? `
+    <div class="form-grid">
       <div class="field"><label>Monthly salary</label><input type="number" min="0" id="f_salary" value="${d.salary!==undefined?d.salary:''}" placeholder="e.g. 30000"></div>
       <div class="field"><label>Target working hours / day</label><input type="number" min="0" step="0.5" id="f_hours" value="${d.targetHours!==undefined?d.targetHours:8}"></div>
     </div>
     <div class="doc-block"><div class="doc-block-title">CNIC / PASSPORT</div>${!UI.modal.docsLoaded ? `<div class="field-hint">Loading…</div>` : docPreviewOrUpload('idDoc', docs)}</div>
     <div class="doc-block"><div class="doc-block-title">EMPLOYMENT CONTRACT</div>${!UI.modal.docsLoaded ? `<div class="field-hint">Loading…</div>` : docPreviewOrUpload('contract', docs)}</div>
+    ` : `<div class="doc-block"><div class="field-hint">You don't have permission to view or edit salary and identity documents for employees. Ask your admin if you need access.</div></div>`}
     <div class="modal-actions"><button class="btn" style="flex:1" onclick="closeModal()">Cancel</button><button class="btn btn-primary" style="flex:1" onclick="saveEmployee()">Save employee</button></div>
   </div></div>`;
 }
@@ -703,8 +736,11 @@ async function saveEmployee(){
   d.name = name; d.code = document.getElementById('f_code').value.trim(); d.role = document.getElementById('f_role').value.trim();
   d.phone = document.getElementById('f_phone').value.trim(); d.branchId = isAdmin() ? document.getElementById('f_branch').value : myBranchId();
   d.shiftId = document.getElementById('f_shift').value; d.joinDate = document.getElementById('f_join').value; d.status = document.getElementById('f_status').value;
-  d.salary = document.getElementById('f_salary').value ? Number(document.getElementById('f_salary').value) : '';
-  d.targetHours = document.getElementById('f_hours').value ? Number(document.getElementById('f_hours').value) : 8;
+  if(hasPerm(CURRENT_USER,'employeeDocs')){
+    const salaryEl = document.getElementById('f_salary'); const hoursEl = document.getElementById('f_hours');
+    if(salaryEl) d.salary = salaryEl.value ? Number(salaryEl.value) : '';
+    if(hoursEl) d.targetHours = hoursEl.value ? Number(hoursEl.value) : 8;
+  }
   if(!d.id){ d.id = uid('emp'); DB.employees.push(d); } else { DB.employees[DB.employees.findIndex(x=>x.id===d.id)] = d; }
   await saveKey('employees'); await saveEmpDocs(d.id, UI.modal.docs); closeModal(); renderTab();
 }
@@ -784,6 +820,83 @@ async function saveLeave(){
 }
 async function updateLeaveStatus(id, status){ const l = DB.leaves.find(x=>x.id===id); if(l){ l.status=status; await saveKey('leaves'); renderTab(); } }
 async function deleteLeave(id){ DB.leaves = DB.leaves.filter(l=>l.id!==id); await saveKey('leaves'); renderTab(); }
+
+/* ============================= COMPLAINTS ============================= */
+function renderComplaints(){
+  const branches = visibleBranches();
+  const branchSelector = isAdmin()
+    ? `<div class="field"><label>Branch</label><select onchange="UI.complaintFilters.branch=this.value;renderTab()"><option value="all">All branches</option>${branches.map(b=>`<option value="${b.id}" ${UI.complaintFilters.branch===b.id?'selected':''}>${esc(b.name)}</option>`).join('')}</select></div>`
+    : `<div class="locked-branch-tag">&#127970; ${esc(branchName(myBranchId()))}</div>`;
+  let list = DB.complaints.slice().sort((a,b)=> b.createdAt.localeCompare(a.createdAt));
+  const branchFilter = isAdmin() ? UI.complaintFilters.branch : myBranchId();
+  if(branchFilter!=='all') list = list.filter(c=>c.branchId===branchFilter);
+  if(UI.complaintFilters.status!=='all') list = list.filter(c=>c.status===UI.complaintFilters.status);
+  if(UI.complaintFilters.type!=='all') list = list.filter(c=>c.type===UI.complaintFilters.type);
+
+  const rows = list.map(c=>{
+    const e = empById(c.employeeId);
+    return `<tr>
+      <td>${fmtDateShort(c.date)}</td>
+      <td>${e? esc(e.name) : 'Unknown'}</td>
+      <td>${esc(branchName(c.branchId))}</td>
+      <td>${esc(c.type)}</td>
+      <td style="max-width:240px;">${esc(c.description||'—')}</td>
+      <td>${esc(c.customerName||'—')}</td>
+      <td>${esc(c.loggedBy||'—')}</td>
+      <td><select onchange="updateComplaintStatus('${c.id}', this.value)" class="badge ${c.status==='Resolved'?'badge-present':'badge-late'}" style="border:none;"><option ${c.status==='Open'?'selected':''}>Open</option><option ${c.status==='Resolved'?'selected':''}>Resolved</option></select></td>
+      <td><button class="btn btn-sm btn-danger" onclick="deleteComplaint('${c.id}')">Delete</button></td>
+    </tr>`;
+  }).join('');
+  const openCount = list.filter(c=>c.status==='Open').length;
+
+  return `
+    <div class="filter-bar">
+      ${branchSelector}
+      <div class="field"><label>Status</label><select onchange="UI.complaintFilters.status=this.value;renderTab()"><option value="all">All statuses</option><option>Open</option><option>Resolved</option></select></div>
+      <div class="field"><label>Type</label><select onchange="UI.complaintFilters.type=this.value;renderTab()"><option value="all">All types</option>${COMPLAINT_TYPES.map(t=>`<option ${UI.complaintFilters.type===t?'selected':''}>${t}</option>`).join('')}</select></div>
+      <button class="btn btn-primary" style="margin-left:auto" onclick="openComplaintModal()">+ Log complaint</button>
+    </div>
+    <div class="stat-grid"><div class="stat-card out"><div class="stat-num">${openCount}</div><div class="stat-label">Open complaints (filtered view)</div></div><div class="stat-card"><div class="stat-num">${list.length}</div><div class="stat-label">Total in view</div></div></div>
+    <div class="table-wrap">
+      <table><thead><tr><th>Date</th><th>Employee</th><th>Branch</th><th>Type</th><th>Details</th><th>Customer</th><th>Logged by</th><th>Status</th><th></th></tr></thead>
+      <tbody>${rows || `<tr class="empty-row"><td colspan="9">No complaints logged yet.</td></tr>`}</tbody></table>
+    </div>`;
+}
+function openComplaintModal(){
+  const pool = isAdmin() ? DB.employees : DB.employees.filter(e=>e.branchId===myBranchId());
+  if(pool.length===0){ alert('Add an employee first.'); return; }
+  UI.modal = {type:'complaint', data:{employeeId: pool[0].id, type: COMPLAINT_TYPES[0], description:'', customerName:'', date: todayStr()}};
+  renderModal();
+}
+function renderComplaintModal(){
+  const d = UI.modal.data;
+  const pool = isAdmin() ? DB.employees : DB.employees.filter(e=>e.branchId===myBranchId());
+  document.getElementById('modalRoot').innerHTML = `<div class="modal-backdrop" onclick="if(event.target===this) closeModal()"><div class="modal" style="position:relative;"><button class="close-x" onclick="closeModal()">&times;</button><h3>Log a customer complaint</h3><div class="sub">Recorded against the employee for this branch</div>
+    <div class="field"><label>Employee</label><select id="c_emp">${pool.map(e=>`<option value="${e.id}" ${d.employeeId===e.id?'selected':''}>${esc(e.name)} — ${esc(branchName(e.branchId))}</option>`).join('')}</select></div>
+    <div class="form-grid">
+      <div class="field"><label>Complaint type</label><select id="c_type">${COMPLAINT_TYPES.map(t=>`<option ${d.type===t?'selected':''}>${t}</option>`).join('')}</select></div>
+      <div class="field"><label>Date</label><input type="date" id="c_date" value="${d.date}"></div>
+    </div>
+    <div class="field"><label>Customer name (optional)</label><input id="c_customer" value="${esc(d.customerName)}"></div>
+    <div class="field"><label>Details</label><textarea id="c_desc" placeholder="What happened?">${esc(d.description)}</textarea></div>
+    <div class="modal-actions"><button class="btn" style="flex:1" onclick="closeModal()">Cancel</button><button class="btn btn-primary" style="flex:1" onclick="saveComplaint()">Log complaint</button></div>
+  </div></div>`;
+}
+async function saveComplaint(){
+  const d = UI.modal.data;
+  d.employeeId = document.getElementById('c_emp').value;
+  if(!d.employeeId){ alert('Select an employee.'); return; }
+  d.type = document.getElementById('c_type').value;
+  d.date = document.getElementById('c_date').value;
+  d.customerName = document.getElementById('c_customer').value.trim();
+  d.description = document.getElementById('c_desc').value.trim();
+  const emp = empById(d.employeeId);
+  const record = {id: uid('cmp'), employeeId: d.employeeId, branchId: emp.branchId, type: d.type, description: d.description, customerName: d.customerName, date: d.date, status:'Open', loggedBy: CURRENT_USER.name, createdAt: new Date().toISOString()};
+  DB.complaints.push(record);
+  await saveKey('complaints'); closeModal(); renderTab();
+}
+async function updateComplaintStatus(id, status){ const c = DB.complaints.find(x=>x.id===id); if(c){ c.status=status; await saveKey('complaints'); renderTab(); } }
+async function deleteComplaint(id){ if(!confirm('Delete this complaint record?')) return; DB.complaints = DB.complaints.filter(c=>c.id!==id); await saveKey('complaints'); renderTab(); }
 
 /* ============================= PAYROLL ============================= */
 function renderPayroll(){
@@ -953,13 +1066,20 @@ function exportCSV(){
 
 /* ============================= USERS (admin only) ============================= */
 function renderUsers(){
-  const rows = DB.users.map(u=>`<tr><td>${esc(u.name)}</td><td class="mono">${esc(u.username)}</td><td><span class="badge ${u.role==='admin'?'badge-admin':'badge-branch'}">${u.role==='admin'?'Admin':'Branch manager'}</span></td><td>${u.role==='branch'? esc(branchName(u.branchId)) : 'All branches'}</td><td><button class="btn btn-sm" onclick="editUser('${u.id}')">Edit</button> ${u.id!==CURRENT_USER.id ? `<button class="btn btn-sm btn-danger" onclick="deleteUser('${u.id}')">Delete</button>` : ''}</td></tr>`).join('');
-  return `<div class="filter-bar"><div class="tag-locked">Branch managers can only see and manage their own branch's data. Admins see everything.</div><button class="btn btn-primary" style="margin-left:auto" onclick="editUser(null)">+ Add user</button></div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Branch</th><th></th></tr></thead><tbody>${rows || `<tr class="empty-row"><td colspan="5">No users yet.</td></tr>`}</tbody></table></div>`;
+  const rows = DB.users.map(u=>{
+    const restricted = u.role==='branch' && PERMISSION_KEYS.some(k=>hasPerm(u,k)===false);
+    return `<tr><td>${esc(u.name)}</td><td class="mono">${esc(u.username)}</td><td><span class="badge ${u.role==='admin'?'badge-admin':'badge-branch'}">${u.role==='admin'?'Admin':'Branch manager'}</span></td><td>${u.role==='branch'? esc(branchName(u.branchId)) : 'All branches'}</td><td>${restricted? `<span class="badge badge-late">Restricted access</span>` : `<span class="field-hint">Full access</span>`}</td><td><button class="btn btn-sm" onclick="editUser('${u.id}')">Edit</button> ${u.id!==CURRENT_USER.id ? `<button class="btn btn-sm btn-danger" onclick="deleteUser('${u.id}')">Delete</button>` : ''}</td></tr>`;
+  }).join('');
+  return `<div class="filter-bar"><div class="tag-locked">Branch managers can only see and manage their own branch's data. Admins see everything.</div><button class="btn btn-primary" style="margin-left:auto" onclick="editUser(null)">+ Add user</button></div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Branch</th><th>Permissions</th><th></th></tr></thead><tbody>${rows || `<tr class="empty-row"><td colspan="6">No users yet.</td></tr>`}</tbody></table></div>`;
 }
 function editUser(id){ const u = id? DB.users.find(x=>x.id===id) : {id:null, name:'', username:'', password:'', role:'branch', branchId: DB.branches[0]?.id||''}; UI.modal = {type:'user', data:Object.assign({}, u)}; renderModal(); }
 function renderUserModal(){
   const d = UI.modal.data;
-  document.getElementById('modalRoot').innerHTML = `<div class="modal-backdrop" onclick="if(event.target===this) closeModal()"><div class="modal" style="position:relative;"><button class="close-x" onclick="closeModal()">&times;</button><h3>${d.id?'Edit user':'Add user'}</h3><div class="sub">Login access — branch managers only see their assigned branch</div><div class="field"><label>Full name</label><input id="u_name" value="${esc(d.name)}"></div><div class="field"><label>Username</label><input id="u_user" value="${esc(d.username)}"></div><div class="field"><label>Password ${d.id?'(leave blank to keep current)':''}</label><input id="u_pass" type="text" placeholder="${d.id?'••••••••':'Set a password'}"></div><div class="field"><label>Role</label><select id="u_role" onchange="document.getElementById('u_branch_wrap').style.display=this.value==='branch'?'flex':'none'"><option value="branch" ${d.role==='branch'?'selected':''}>Branch manager</option><option value="admin" ${d.role==='admin'?'selected':''}>Admin (all branches)</option></select></div><div class="field" id="u_branch_wrap" style="${d.role==='branch'?'':'display:none'}"><label>Branch</label><select id="u_branch">${DB.branches.map(b=>`<option value="${b.id}" ${d.branchId===b.id?'selected':''}>${esc(b.name)}</option>`).join('') || '<option value="">Add a branch first</option>'}</select></div><div class="modal-actions"><button class="btn" style="flex:1" onclick="closeModal()">Cancel</button><button class="btn btn-primary" style="flex:1" onclick="saveUser()">Save user</button></div></div></div>`;
+  const perms = Object.assign({payroll:true, employeeDocs:true, complaints:true}, d.permissions||{});
+  const permChecks = PERMISSION_KEYS.map(k=>`<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-soft);font-weight:500;margin-bottom:6px;"><input type="checkbox" id="u_perm_${k}" ${perms[k]!==false?'checked':''}> ${esc(PERMISSION_LABELS[k])}</label>`).join('');
+  document.getElementById('modalRoot').innerHTML = `<div class="modal-backdrop" onclick="if(event.target===this) closeModal()"><div class="modal" style="position:relative;"><button class="close-x" onclick="closeModal()">&times;</button><h3>${d.id?'Edit user':'Add user'}</h3><div class="sub">Login access — branch managers only see their assigned branch</div><div class="field"><label>Full name</label><input id="u_name" value="${esc(d.name)}"></div><div class="field"><label>Username</label><input id="u_user" value="${esc(d.username)}"></div><div class="field"><label>Password ${d.id?'(leave blank to keep current)':''}</label><input id="u_pass" type="text" placeholder="${d.id?'••••••••':'Set a password'}"></div><div class="field"><label>Role</label><select id="u_role" onchange="document.getElementById('u_branch_wrap').style.display=this.value==='branch'?'flex':'none';document.getElementById('u_perm_wrap').style.display=this.value==='branch'?'block':'none'"><option value="branch" ${d.role==='branch'?'selected':''}>Branch manager</option><option value="admin" ${d.role==='admin'?'selected':''}>Admin (all branches)</option></select></div><div class="field" id="u_branch_wrap" style="${d.role==='branch'?'':'display:none'}"><label>Branch</label><select id="u_branch">${DB.branches.map(b=>`<option value="${b.id}" ${d.branchId===b.id?'selected':''}>${esc(b.name)}</option>`).join('') || '<option value="">Add a branch first</option>'}</select></div>
+    <div class="field" id="u_perm_wrap" style="${d.role==='branch'?'':'display:none'}"><label>What this user can access</label><div class="doc-block">${permChecks}<div class="field-hint">Unchecked items are hidden from this user entirely.</div></div></div>
+    <div class="modal-actions"><button class="btn" style="flex:1" onclick="closeModal()">Cancel</button><button class="btn btn-primary" style="flex:1" onclick="saveUser()">Save user</button></div></div></div>`;
 }
 async function saveUser(){
   const d = UI.modal.data; const name = document.getElementById('u_name').value.trim(); const username = document.getElementById('u_user').value.trim();
@@ -971,6 +1091,10 @@ async function saveUser(){
   const clash = DB.users.find(u=>u.username.toLowerCase()===username.toLowerCase() && u.id!==d.id);
   if(clash){ alert('That username is already taken.'); return; }
   d.name = name; d.username = username; d.role = role; d.branchId = branchId; if(pass) d.password = pass;
+  if(role==='branch'){
+    d.permissions = {};
+    PERMISSION_KEYS.forEach(k=>{ const el = document.getElementById('u_perm_'+k); d.permissions[k] = el ? el.checked : true; });
+  } else { d.permissions = undefined; }
   if(!d.id){ d.id = uid('usr'); DB.users.push(d); } else{ DB.users[DB.users.findIndex(x=>x.id===d.id)] = d; }
   await saveKey('users'); closeModal(); renderTab();
 }
@@ -1030,7 +1154,5 @@ async function savePayrollRules(){
 /* ============================= INIT ============================= */
 loadDB();
 </script>
-</sb_publishable_DDgXULXQnG63Hu-wJQIM2w_8pvNEngo>
-</eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5jaWdzZXl6cXNzc3BnZG1tbnRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5ODA3MDEsImV4cCI6MjEwMDU1NjcwMX0.bUxK-LhHjQgO7PjgaRtVN605a6lF2uWJHdBE9JiKbEI>
 </body>
 </html>
