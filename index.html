@@ -194,7 +194,7 @@ tr:last-child td{border-bottom:none;}
    See the setup instructions the assistant provided alongside this file.
    ========================================================================= */
 const CLOUD_CONFIG = {
-  supabaseUrl: 'https://xzrtzxjdscakredwvllt.supabase.co',
+  supabaseUrl: 'https://xzrtzxjdscakredwvllt.supabase.co',  
   supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh6cnR6eGpkc2Nha3JlZHd2bGx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2OTAwMjksImV4cCI6MjEwMTI2NjAyOX0.H9cUM6F5TwETwEpJsLb31j4B6YTs15obTfoq_ZWjzpk'
 };
 const CLOUD_ENABLED = !!(CLOUD_CONFIG.supabaseUrl && CLOUD_CONFIG.supabaseAnonKey);
@@ -647,7 +647,7 @@ function renderModal(){
   if(!UI.modal){ root.innerHTML=''; return; }
   if(UI.modal.type==='punch'){
     const e = empById(UI.modal.empId); const dir = UI.modal.direction;
-    root.innerHTML = `<div class="modal-backdrop" onclick="if(event.target===this) closeModal()"><div class="modal" style="position:relative;"><button class="close-x" onclick="closeModal()">&times;</button><h3>${dir==='in'?'Punch In':'Punch Out'} — ${esc(e.name)}</h3><div class="sub">${esc(branchName(e.branchId))} · ${esc(e.role||'')}</div><div class="modal-clock"><span>This action will record</span><span id="modalClock" class="mono">${fmtTime(new Date().toISOString())}</span></div><div class="photo-drop" id="photoDrop">${UI.modal.photo ? `<img class="photo-preview" src="${UI.modal.photo}"><div style="font-size:12px;color:var(--ink-soft);margin-bottom:6px;">Photo captured</div>` : `<div style="font-size:24px;margin-bottom:6px;">&#128247;</div><div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:10px;">Optional: attach a photo for verification</div>`}<input type="file" accept="image/*" capture="environment" id="photoInput" style="display:none" onchange="handlePhotoPick(event)"><button class="btn btn-sm" onclick="document.getElementById('photoInput').click()">${UI.modal.photo?'Retake photo':'Take / upload photo'}</button>${UI.modal.photo ? `<button class="btn btn-sm btn-ghost" onclick="UI.modal.photo=null;renderModal()">Remove</button>` : ''}</div><div class="field"><label>Note (optional)</label><input placeholder="e.g. late due to traffic" value="${esc(UI.modal.note)}" oninput="UI.modal.note=this.value"></div><div class="modal-actions"><button class="btn" style="flex:1" onclick="closeModal()">Cancel</button><button class="btn ${dir==='in'?'btn-in':'btn-out'}" style="flex:1" onclick="confirmPunch()">Confirm ${dir==='in'?'Punch In':'Punch Out'}</button></div></div></div>`;
+    root.innerHTML = `<div class="modal-backdrop" onclick="if(event.target===this) closeModal()"><div class="modal" style="position:relative;"><button class="close-x" onclick="closeModal()">&times;</button><h3>${dir==='in'?'Punch In':'Punch Out'} — ${esc(e.name)}</h3><div class="sub">${esc(branchName(e.branchId))} · ${esc(e.role||'')}</div><div class="modal-clock"><span>This action will record</span><span id="modalClock" class="mono">${fmtTime(new Date().toISOString())}</span></div><div class="photo-drop" id="photoDrop">${UI.modal.photo ? `<img class="photo-preview" src="${UI.modal.photo}"><div style="font-size:12px;color:var(--ink-soft);margin-bottom:6px;">Photo captured</div>` : `<div style="font-size:24px;margin-bottom:6px;">&#128247;</div><div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:10px;">Optional: attach a photo for verification</div>`}<input type="file" accept="image/*" capture="environment" id="photoInput" style="display:none" onchange="handlePhotoPick(event)"><button class="btn btn-sm" onclick="document.getElementById('photoInput').click()">${UI.modal.photo?'Retake photo':'Take / upload photo'}</button>${UI.modal.photo ? `<button class="btn btn-sm btn-ghost" onclick="UI.modal.photo=null;renderModal()">Remove</button>` : ''}</div><div class="field"><label>Note (optional)</label><input placeholder="e.g. late due to traffic" value="${esc(UI.modal.note)}" oninput="UI.modal.note=this.value"></div><div class="modal-actions"><button class="btn" style="flex:1" onclick="closeModal()">Cancel</button><button class="btn ${dir==='in'?'btn-in':'btn-out'}" style="flex:1" onclick="confirmPunch(this)">Confirm ${dir==='in'?'Punch In':'Punch Out'}</button></div></div></div>`;
   } else if(UI.modal.type==='employee'){ renderEmployeeModal(); }
   else if(UI.modal.type==='branch'){ renderBranchModal(); }
   else if(UI.modal.type==='shift'){ renderShiftModal(); }
@@ -658,7 +658,10 @@ function renderModal(){
 }
 function closeModal(){ UI.modal=null; renderModal(); }
 async function handlePhotoPick(ev){ const file = ev.target.files[0]; if(!file) return; try{ UI.modal.photo = await compressImage(file, 360, 0.6); renderModal(); }catch(err){ alert('Could not read photo, try again.'); } }
-async function confirmPunch(){
+async function confirmPunch(btn){
+  if(!UI.modal || UI.modal.submitting) return; /* guard against double-tap / double-click firing this twice */
+  UI.modal.submitting = true;
+  if(btn) btn.disabled = true;
   const e = empById(UI.modal.empId); const now = new Date().toISOString();
   if(UI.modal.direction==='in'){
     DB.attendance.push({id: uid('att'), employeeId: e.id, branchId: e.branchId, shiftId: e.shiftId, date: todayStr(), punchIn: now, punchInPhoto: UI.modal.photo, punchOut: null, punchOutPhoto: null, note: UI.modal.note || ''});
@@ -1126,6 +1129,12 @@ function renderSettings(){
       <button class="btn btn-primary" onclick="savePayrollRules()">Save payroll rules</button>
     </div>
 
+    <div class="section-head"><h2>Data maintenance</h2></div>
+    <div class="card" style="margin-bottom:20px;">
+      <div class="field-hint" style="margin-bottom:12px;">Removes attendance records that are exact duplicates of another record (same employee, date, punch-in and punch-out time) — caused by accidentally tapping "Confirm" twice. Keeps the first copy of each, deletes the rest.</div>
+      <button class="btn btn-primary" onclick="cleanupDuplicateAttendance()">Find &amp; remove duplicate punches</button>
+    </div>
+
     <div class="section-head"><h2>Cloud sync</h2></div>
     <div class="card">
       <div style="margin-bottom:10px;">${CLOUD_ENABLED ? `<span class="badge badge-approved">Connected to Supabase</span>` : `<span class="badge badge-draft">Not connected — using ${STORAGE_AVAILABLE?"Claude's built-in storage":'in-memory only'}</span>`}</div>
@@ -1136,6 +1145,18 @@ function renderSettings(){
       <div class="field-hint">Note: the anon key is meant to be public, but the policy above allows any holder of this file to read and write all data — the same shared-access model as before, just now durable across devices instead of tied to one Claude conversation.</div>
     </div>
   `;
+}
+async function cleanupDuplicateAttendance(){
+  const seen = new Set(); const kept = []; let removed = 0;
+  DB.attendance.forEach(r=>{
+    const key = [r.employeeId, r.date, r.punchIn||'', r.punchOut||''].join('|');
+    if(seen.has(key)){ removed++; } else { seen.add(key); kept.push(r); }
+  });
+  if(removed===0){ alert('No duplicate punch records found.'); return; }
+  if(!confirm(`Found ${removed} duplicate record(s). Remove them? This cannot be undone.`)) return;
+  DB.attendance = kept;
+  await saveKey('attendance'); renderTab();
+  alert(`Removed ${removed} duplicate record(s).`);
 }
 async function handleLogoPick(ev){ const file = ev.target.files[0]; if(!file) return; try{ DB.settings.companyLogo = await compressImage(file, 200, 0.8); renderTab(); }catch(e){ alert('Could not read logo.'); } }
 function clearLogo(){ DB.settings.companyLogo = null; renderTab(); }
